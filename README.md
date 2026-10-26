@@ -122,23 +122,45 @@ lets you point to sources.
   ┌──────────┐   ┌───────────┐   ┌────────┐   ┌────────────┐
   │ public   │──▶│ clean +   │──▶│ embed  │──▶│ Postgres + │
   │ .md file │   │ chunk+hash│   │(local) │   │ pgvector   │
-  └──────────┘   └───────────┘   └────────┘   └─────▲──────┘
-                                                      │
-   PER QUESTION: QUERY (planned)                      │
-  ┌────────┐  token  ┌──────────┐  ┌────────┐   ┌─────┴──────┐
-  │ client │────────▶│ FastAPI  │─▶│ auth:  │──▶│ search,    │
-  │        │         │/v1/query │  │ who?   │   │ filtered by│
-  └───▲────┘         └────┬─────┘  └────────┘   │ role in SQL│
-      │                   │ embed question      └─────┬──────┘
-      │ answer +          ▼                           │ top chunks
-      │ citations   ┌──────────┐   chunks + question  │
-      └─────────────│  LLM     │◀─────────────────────┘
-                    │ (Ollama, │
-                    │  local)  │──▶ metadata-only trace (LangSmith)
-                    └──────────┘
+  └──────────┘   └───────────┘   └────────┘   └────────────┘
 ```
 
+```
+   PER QUESTION: QUERY (planned). FastAPI is the hub; nothing else talks to each other.
+
+                                  ┌───────────────────────┐  2. token ⇄ role    ┌──────────────┐
+  ┌────────┐ 1. question + token  │                       │ ◀─────────────────▶ │ Auth         │
+  │        │ ───────────────────▶ │                       │                     └──────────────┘
+  │ client │                      │        FastAPI        │  3. question ⇄      ┌──────────────┐
+  │        │ ◀─────────────────── │     POST /v1/query    │     vector          │ Embedder     │
+  └────────┘ 7. answer +          │    (orchestrator)     │ ◀─────────────────▶ │ (local)      │
+             citations only       │                       │                     └──────────────┘
+                                  │                       │  4. vector + role ⇄ ┌──────────────┐
+                                  │                       │     top chunks      │ Postgres +   │
+                                  │                       │ ◀─────────────────▶ │ pgvector     │
+                                  │                       │  (role filter is    └──────────────┘
+                                  │                       │   inside the SQL)
+                                  │                       │  5. question +      ┌──────────────┐
+                                  │                       │     chunks ⇄ answer │ LLM          │
+                                  │                       │ ◀─────────────────▶ │ (Ollama,     │
+                                  │                       │                     │  local)      │
+                                  │                       │  6. metadata only   └──────────────┘
+                                  │                       │ ──────────────────▶ ┌──────────────┐
+                                  └───────────────────────┘                     │ LangSmith    │
+                                                                                └──────────────┘
+```
+
+Reading the numbers (⇄ means FastAPI sends a request and gets a reply):
+1. The client sends a question and a token.
+2. FastAPI resolves the token to a role. No valid token means a 401 error.
+3. FastAPI turns the question into a vector.
+4. FastAPI searches Postgres. The role filter is part of the SQL, so forbidden chunks are never returned.
+5. FastAPI builds the prompt (question plus the allowed chunks, marked untrusted) and sends it to the LLM. The LLM replies with text.
+6. FastAPI records a trace with metadata only (request ID, role, chunk count, model, duration).
+7. FastAPI returns the answer and citations. The client never sees raw chunks, prompts or internal errors.
+
 **Security points:**
+- The client, the database and the LLM never connect directly. Every rule is enforced in one place.
 - Role filtering happens in the SQL query, before ranking, so forbidden text never reaches the
   LLM.
 - Retrieved text is treated as untrusted (it could contain prompt injection).
