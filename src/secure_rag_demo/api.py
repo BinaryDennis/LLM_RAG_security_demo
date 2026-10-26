@@ -1,3 +1,4 @@
+import time
 import uuid
 from collections.abc import Iterator
 from functools import lru_cache
@@ -15,6 +16,7 @@ from secure_rag_demo.embeddings import EmbeddingService, FastEmbedService
 from secure_rag_demo.providers import ChatProvider, OpenAICompatibleProvider, ProviderError
 from secure_rag_demo.retrieval import search_chunks
 from secure_rag_demo.schemas import QueryRequest, QueryResponse
+from secure_rag_demo.tracing import TraceSink, build_sink, trace_query
 
 
 def get_principal(authorization: Annotated[str | None, Header()] = None) -> Principal:
@@ -41,6 +43,11 @@ def get_provider() -> ChatProvider:
     return OpenAICompatibleProvider(get_settings())
 
 
+@lru_cache
+def get_trace_sink() -> TraceSink | None:
+    return build_sink(get_settings())
+
+
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Secure RAG Demo",
@@ -58,16 +65,34 @@ def create_app() -> FastAPI:
         session: Annotated[Session, Depends(get_session)],
         embedder: Annotated[EmbeddingService, Depends(get_embedder)],
         provider: Annotated[ChatProvider, Depends(get_provider)],
+        sink: Annotated[TraceSink | None, Depends(get_trace_sink)],
     ) -> QueryResponse:
         request_id = uuid.uuid4()
+        started = time.perf_counter()
+        model = get_settings().llm_model
+
+        def record(count: int, outcome: str) -> None:
+            trace_query(
+                sink,
+                request_id,
+                principal,
+                count,
+                model,
+                outcome,
+                (time.perf_counter() - started) * 1000,
+            )
+
         try:
             chunks = search_chunks(session, embedder.embed_query(body.question), principal)
         except SQLAlchemyError:
+            record(0, "db_error")
             raise HTTPException(status_code=503, detail="Service unavailable") from None
         try:
             answer, citations, abstained = answer_question(body.question, chunks, provider)
         except ProviderError:
+            record(len(chunks), "provider_error")
             raise HTTPException(status_code=503, detail="Service unavailable") from None
+        record(len(chunks), "abstained" if abstained else "answered")
         return QueryResponse(
             answer=answer, citations=citations, abstained=abstained, request_id=request_id
         )

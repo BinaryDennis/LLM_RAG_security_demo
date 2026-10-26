@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     demo_token_public: str = "demo-public-token-change-me"
     demo_token_restricted: str = "demo-restricted-token-change-me"
 
+    # Tracing is opt-in; content hiding is on by default.
+    langsmith_tracing: bool = False
+    langsmith_hide_inputs: bool = True
+    langsmith_hide_outputs: bool = True
+
 
 def get_settings() -> Settings:
     return Settings()
