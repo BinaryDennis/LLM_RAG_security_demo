@@ -1,0 +1,42 @@
+[project]
+name = "secure-rag-demo"
+version = "0.1.0"
+description = "Educational secure, traceable Swedish RAG API demo (public documents only)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.2",
+    "pgvector>=0.3",
+    "alembic>=1.13",
+    "fastembed>=0.4",
+    "openai>=1.50",
+    "langsmith>=0.2",
+    "pydantic-settings>=2.4",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "httpx>=0.27",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/secure_rag_demo"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true

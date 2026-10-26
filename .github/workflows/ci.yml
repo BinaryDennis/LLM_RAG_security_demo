@@ -1,0 +1,27 @@
+name: ci
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: rag
+          POSTGRES_PASSWORD: ci-fake-password
+          POSTGRES_DB: rag
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U rag" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://rag:ci-fake-password@127.0.0.1:5432/rag
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run mypy src
+      - run: uv run pytest -q
