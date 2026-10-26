@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     llm_api_key: str = "ollama"
     llm_model: str = "llama3.1"
 
+    # EDUCATIONAL ONLY: static demo tokens, not production authentication.
+    demo_token_public: str = "demo-public-token-change-me"
+    demo_token_restricted: str = "demo-restricted-token-change-me"
+
 
 def get_settings() -> Settings:
     return Settings()
