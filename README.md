@@ -41,8 +41,8 @@ errors, and trace redaction:
 uv run pytest -q
 ```
 
-The versioned evaluation set contains ten supported Swedish public-information questions and
-three unsupported questions. With the sources ingested and the local API running:
+The versioned evaluation set contains 23 supported Swedish public-information questions covering all
+eight ingested sources, and five unsupported questions. With the sources ingested and the local API running:
 
 ```bash
 EVAL_BEARER_TOKEN=YOUR_LOCAL_DEMO_TOKEN uv run python -m evals.evaluate
@@ -225,7 +225,7 @@ below).
   Layer 1: automated tests        Layer 2: evaluation set        Layer 3: Promptfoo red team
   (pytest, every push in CI)      (evals/evaluate.py)            (security/promptfoo.yaml)
   ┌──────────────────────┐        ┌──────────────────────┐       ┌──────────────────────┐
-  │ fake model + fake    │        │ 13 Swedish questions │       │ LLM-written attack   │
+  │ fake model + fake    │        │ 28 Swedish questions │       │ LLM-written attack   │
   │ embedder, real       │        │ to send to the       │       │ prompts to send to   │
   │ Postgres             │        │ running API + real   │       │ the running API      │
   │ fast, deterministic  │        │ Ollama; checks       │       │ checks leaks, role   │
@@ -249,8 +249,8 @@ are the same every time and need no network. Key security checks:
 | Traces contain metadata only, never question, chunk text or answer | `test_tracing.py` |
 | Promptfoo target refuses non-local URLs and requires a token | `test_promptfoo_target.py` |
 
-**Layer 2: evaluation set (`evals/`).** `public_questions.jsonl` holds 10 questions the ingested
-public sources can answer and 3 they cannot. When run against the live API, `evals.evaluate`
+**Layer 2: evaluation set (`evals/`).** `public_questions.jsonl` holds 23 questions the eight ingested
+public sources can answer (at least two per source) and 5 they cannot. When run against the live API, `evals.evaluate`
 sends each question and checks that supported questions cite the expected source URL and that
 unsupported questions abstain with no answer and no citations. The set and evaluator exist, but
 no live run has happened yet.

@@ -6,9 +6,11 @@
 request bounds, generic provider/database errors, and metadata-only tracing. These tests use fake
 model and embedder implementations and do not call an external model.
 
-`evals/public_questions.jsonl` contains ten supported Swedish public-information questions and
-three unsupported questions. `evals/sources.json` maps stable source IDs to official URLs. With the
-API running and those sources ingested, run:
+`evals/public_questions.jsonl` contains 23 supported Swedish public-information questions, covering
+all eight sources, and five unsupported questions. `evals/sources.json` maps stable source IDs to
+official URLs. `tests/test_evaluation.py` checks that every expected source is registered and that
+every registered source has at least one supported question. With the API running and those
+sources ingested, run:
 
 ```bash
 EVAL_BEARER_TOKEN=demo-public-token-change-me uv run python -m evals.evaluate
@@ -17,6 +19,19 @@ EVAL_BEARER_TOKEN=demo-public-token-change-me uv run python -m evals.evaluate
 The evaluator checks expected source citations and requires unsupported cases to abstain without
 answer text or citations. It does not grade factual correctness, citation entailment, or answer
 quality. Review results against the source pages.
+
+### Retrieval-only check (2026-10-27)
+
+With the eight sources ingested (78 chunks, `intfloat/multilingual-e5-small`), each question was
+embedded and passed to `search_chunks` with the public principal; no LLM was called. All 23
+supported questions ranked a chunk from the expected source first (cosine distance 0.076–0.175).
+
+Finding: the five unsupported questions also retrieved chunks, at distances of 0.122–0.184. That
+overlaps the supported range, so the API will not abstain on them: it only abstains when retrieval
+returns nothing. A distance threshold alone would not separate the two groups. Abstention then
+depends on the model following the system prompt's "say you cannot answer" rule, which the
+evaluator does not count as abstention. Expect the unsupported cases to fail in a live run until
+an answerability check is added. This is an accepted, documented limitation for the demo.
 
 ## Promptfoo probes
 
@@ -33,9 +48,9 @@ npx promptfoo redteam run -c security/promptfoo.yaml
 The configuration uses local Ollama (`llama3.1`) for attack generation and grading, and the command
 disables remote generation and result sharing.
 
-The configuration validates with Promptfoo 0.125.1. A live red-team scan has not yet been run:
-the local Ollama server is not running and the selected source pages have not yet been ingested.
-Start the model and API and add the reviewed public corpus before recording live results.
+The configuration validates with Promptfoo 0.125.1. A live red-team scan has not yet been run. Ollama is
+running and the eight public source pages are ingested locally; start the API before recording
+live results.
 
 The configured indirect-injection and document-exfiltration plugins may not fully exercise
 retrieved-document poisoning: the scanner sends requests through the query API and cannot insert

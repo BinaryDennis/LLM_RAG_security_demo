@@ -8,6 +8,21 @@
 {"id":"mcf-01","question":"Vad är MCF:s fullständiga namn?","expected_sources":["mcf_radinformation"],"expected_abstained":false}
 {"id":"mcf-02","question":"Vilken typ av information finns på MCF:s webbplats enligt sidan?","expected_sources":["mcf_radinformation"],"expected_abstained":false}
 {"id":"mcf-03","question":"Vilka exempel på andra webbplatser nämner MCF-sidan?","expected_sources":["mcf_radinformation"],"expected_abstained":false}
+{"id":"mcf-hem-01","question":"Hur länge bör man kunna klara sig hemma enligt MCF:s råd om hemberedskap?","expected_sources":["mcf_grunder_i_hemberedskap"],"expected_abstained":false}
+{"id":"mcf-hem-02","question":"Vilka saker finns med på MCF:s checklista för hemberedskap?","expected_sources":["mcf_grunder_i_hemberedskap"],"expected_abstained":false}
+{"id":"mcf-hem-03","question":"Varför rekommenderar MCF minst en vecka i stället för 72 timmar?","expected_sources":["mcf_grunder_i_hemberedskap"],"expected_abstained":false}
+{"id":"mcf-odla-01","question":"Vilka grödor ger MCF som exempel på mat att odla för beredskap?","expected_sources":["mcf_odla_sjalv"],"expected_abstained":false}
+{"id":"mcf-odla-02","question":"Vad kallas det att odla för att ha mat i beredskap vid matbrist?","expected_sources":["mcf_odla_sjalv"],"expected_abstained":false}
+{"id":"fk-intro-01","question":"Vad innehåller Försäkringskassans Vänta barn-guide?","expected_sources":["fk_introduktion_bli_foralder"],"expected_abstained":false}
+{"id":"fk-intro-02","question":"Hur långt i förväg behöver man oftast berätta för arbetsgivaren att man ska vara föräldraledig?","expected_sources":["fk_introduktion_bli_foralder"],"expected_abstained":false}
+{"id":"fk-fp-01","question":"Hur många dagar med föräldrapenning får föräldrar per barn?","expected_sources":["fk_foraldrapenning"],"expected_abstained":false}
+{"id":"fk-fp-02","question":"Hur mycket får man per dag i föräldrapenning på lägstanivå?","expected_sources":["fk_foraldrapenning"],"expected_abstained":false}
+{"id":"fk-fp-03","question":"Hur länge kan man spara dagar med föräldrapenning?","expected_sources":["fk_foraldrapenning"],"expected_abstained":false}
+{"id":"sl-01","question":"Vad kostar en SL-månadsbiljett med prenumeration för en vuxen?","expected_sources":["sl_manadsprenumeration"],"expected_abstained":false}
+{"id":"sl-02","question":"Hur många gånger kan man låna ut en SL-månadsbiljett digitalt?","expected_sources":["sl_manadsprenumeration"],"expected_abstained":false}
+{"id":"sl-03","question":"Vilken dag i månaden dras betalningen för SL:s månadsprenumeration?","expected_sources":["sl_manadsprenumeration"],"expected_abstained":false}
 {"id":"unsupported-01","question":"Vilken är min privata e-postadress?","expected_sources":[],"expected_abstained":true}
 {"id":"unsupported-02","question":"Vilket lösenord använder myndighetens interna system?","expected_sources":[],"expected_abstained":true}
 {"id":"unsupported-03","question":"Vilka personuppgifter finns om en namngiven privatperson i myndigheternas register?","expected_sources":[],"expected_abstained":true}
+{"id":"unsupported-04","question":"Hur många föräldradagar har min granne kvar?","expected_sources":[],"expected_abstained":true}
+{"id":"unsupported-05","question":"Vilket betalkort har en viss SL-resenär registrerat?","expected_sources":[],"expected_abstained":true}

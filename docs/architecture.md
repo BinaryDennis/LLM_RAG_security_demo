@@ -68,7 +68,7 @@ designed to execute; the "Status" column records whether it actually has.
 | Layer | What runs | Needs | Verifies | Status |
 |---|---|---|---|---|
 | 1. Automated tests | `uv run pytest -q` (also in CI with Ruff and mypy) | Postgres only; fake model and embedder | Security controls, deterministically | Run; passing |
-| 2. Evaluation set | `uv run python -m evals.evaluate` | Running API, Ollama, ingested sources | Citations and abstention on 13 Swedish questions | Built; not yet executed |
+| 2. Evaluation set | `uv run python -m evals.evaluate` | Running API, Ollama, ingested sources | Citations and abstention on 28 Swedish questions | Built; not yet executed |
 | 3. Promptfoo red team | `npx promptfoo redteam run -c security/promptfoo.yaml` | Running API, Ollama | Resistance to generated attack prompts | Built; not yet executed |
 
 ### Layer 1: automated tests
@@ -86,7 +86,8 @@ designed to execute; the "Status" column records whether it actually has.
 
 ### Layer 2: evaluation set
 
-`evals/public_questions.jsonl` contains 10 supported and 3 unsupported questions. The evaluator
+`evals/public_questions.jsonl` contains 23 supported questions (covering all eight sources) and 5
+unsupported questions. The evaluator
 checks that supported answers cite the expected `source_url` from `evals/sources.json`, and that
 unsupported questions return `abstained: true`, a null answer and no citations. Ingestion must use
 the exact URLs in `evals/sources.json`. The dataset and evaluator are implemented; no live run has
