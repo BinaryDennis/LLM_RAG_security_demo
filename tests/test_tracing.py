@@ -65,6 +65,14 @@ def test_tracing_disabled_by_default() -> None:
     assert build_sink(Settings(langsmith_tracing=False)) is None
 
 
+def test_langsmith_client_receives_hide_settings() -> None:
+    from unittest.mock import patch
+
+    with patch("langsmith.Client") as client:
+        build_sink(Settings(langsmith_tracing=True))
+    client.assert_called_once_with(hide_inputs=True, hide_outputs=True)
+
+
 def test_private_strings_never_reach_traces(session: Session, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     settings = Settings(demo_token_public="tok", demo_token_restricted="tok2")
     monkeypatch.setattr("secure_rag_demo.auth.get_settings", lambda: settings)

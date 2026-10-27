@@ -15,10 +15,13 @@ class TraceSink(Protocol):
 class LangSmithSink:
     """Sends metadata-only runs to LangSmith. Content is never part of the payload."""
 
-    def __init__(self) -> None:
+    def __init__(self, settings: Settings) -> None:
         from langsmith import Client
 
-        self._client = Client(hide_inputs=True, hide_outputs=True)
+        self._client = Client(
+            hide_inputs=settings.langsmith_hide_inputs,
+            hide_outputs=settings.langsmith_hide_outputs,
+        )
 
     def send(self, payload: dict[str, Any]) -> None:
         self._client.create_run(
@@ -34,7 +37,7 @@ def build_sink(settings: Settings) -> TraceSink | None:
     """Tracing is off unless LANGSMITH_TRACING=true."""
     if not settings.langsmith_tracing:
         return None
-    return LangSmithSink()
+    return LangSmithSink(settings)
 
 
 def trace_query(
