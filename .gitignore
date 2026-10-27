@@ -6,5 +6,7 @@ __pycache__/
 .mypy_cache/
 evals/results/
 security/results/
+security/redteam.yaml
+.promptfoo/
 data/sources/*.md
 !data/sources/README.md

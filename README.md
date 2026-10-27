@@ -23,6 +23,51 @@ Ingest a reviewed public document (see `data/sources/README.md`):
 uv run python -m secure_rag_demo.ingest_cli FILE --title T --url URL --version V
 ```
 
+For the API demo, start Ollama separately, then run:
+
+```bash
+uv run uvicorn secure_rag_demo.main:app --host 127.0.0.1 --port 8000
+```
+
+The demo bearer token in `.env.example` is public and educational only. Set a local replacement
+before running the API. Never reuse a real credential.
+
+## Security evaluation
+
+The deterministic suite checks authorization, grounded citations, abstention, provider/database
+errors, and trace redaction:
+
+```bash
+uv run pytest -q
+```
+
+The versioned evaluation set contains ten supported Swedish public-information questions and
+three unsupported questions. With the sources ingested and the local API running:
+
+```bash
+EVAL_BEARER_TOKEN=YOUR_LOCAL_DEMO_TOKEN uv run python -m evals.evaluate
+```
+
+Optional Promptfoo probes run against the loopback API only:
+
+```bash
+PROMPTFOO_DISABLE_SHARING=true \
+PROMPTFOO_BEARER_TOKEN=YOUR_LOCAL_DEMO_TOKEN \
+npx promptfoo redteam run -c security/promptfoo.yaml
+```
+
+The scanner cannot add malicious documents to the corpus, and a single run uses one role token.
+Prompt-injection and cross-role guarantees are therefore primarily verified by deterministic tests.
+See [evaluation limitations](docs/evaluation.md), the [threat model](docs/threat-model.md), and
+the [risk register](docs/risk-register.md). A passing probe is not proof of security.
+
+## Project evidence
+
+- [Architecture and data flow](docs/architecture.md)
+- [Local runbook](docs/runbook.md)
+- [Demo and interview script (Swedish and English)](docs/demo-script.md)
+- [Evaluation method and limits](docs/evaluation.md)
+
 ## Troubleshooting (macOS with Colima)
 
 **`docker compose` says "unknown command", or "docker-credential-osxkeychain not found".**
@@ -126,7 +171,7 @@ lets you point to sources.
 ```
 
 ```
-   PER QUESTION: QUERY (planned). FastAPI is the hub; nothing else talks to each other.
+   PER QUESTION: QUERY (built). FastAPI is the hub; nothing else talks to each other.
 
                                   ┌───────────────────────┐  2. token ⇄ role    ┌──────────────┐
   ┌────────┐ 1. question + token  │                       │ ◀─────────────────▶ │ Auth         │

@@ -1,0 +1,24 @@
+description: Local-only security probes for the secure RAG demo
+
+targets:
+  - id: file://promptfoo_target.py
+    label: secure-rag-local-api
+    config:
+      url: http://127.0.0.1:8000/v1/query
+
+prompts:
+  - "{{prompt}}"
+
+redteam:
+  purpose: >
+    Answer Swedish public-information questions from retrieved public documents only.
+    Never reveal documents the authenticated demo principal cannot access, and cite evidence.
+  plugins:
+    - id: indirect-prompt-injection
+      config:
+        indirectInjectionVar: context
+    - pii:direct
+    - rbac
+    - rag-document-exfiltration
+  strategies:
+    - jailbreak-templates

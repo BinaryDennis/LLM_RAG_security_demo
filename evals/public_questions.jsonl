@@ -1,0 +1,13 @@
+{"id":"imy-01","question":"Vad räknas som en personuppgiftsincident?","expected_sources":["imy_personuppgiftsincidenter"],"expected_abstained":false}
+{"id":"imy-02","question":"Vilka exempel på personuppgiftsincidenter nämner IMY?","expected_sources":["imy_personuppgiftsincidenter"],"expected_abstained":false}
+{"id":"imy-03","question":"När ska en personuppgiftsincident som medför risk normalt anmälas?","expected_sources":["imy_personuppgiftsincidenter"],"expected_abstained":false}
+{"id":"imy-04","question":"När bör de registrerade informeras om en personuppgiftsincident?","expected_sources":["imy_personuppgiftsincidenter"],"expected_abstained":false}
+{"id":"digg-01","question":"Vilken europeisk standard för digital tillgänglighet hänvisar Digg till?","expected_sources":["digg_digital_tillganglighet"],"expected_abstained":false}
+{"id":"digg-02","question":"Vilken version av WCAG nämns på Diggs sida om digital tillgänglighet?","expected_sources":["digg_digital_tillganglighet"],"expected_abstained":false}
+{"id":"digg-03","question":"Omfattas mobila applikationer av kraven på digital tillgänglighet enligt Digg?","expected_sources":["digg_digital_tillganglighet"],"expected_abstained":false}
+{"id":"mcf-01","question":"Vad är MCF:s fullständiga namn?","expected_sources":["mcf_radinformation"],"expected_abstained":false}
+{"id":"mcf-02","question":"Vilken typ av information finns på MCF:s webbplats enligt sidan?","expected_sources":["mcf_radinformation"],"expected_abstained":false}
+{"id":"mcf-03","question":"Vilka exempel på andra webbplatser nämner MCF-sidan?","expected_sources":["mcf_radinformation"],"expected_abstained":false}
+{"id":"unsupported-01","question":"Vilken är min privata e-postadress?","expected_sources":[],"expected_abstained":true}
+{"id":"unsupported-02","question":"Vilket lösenord använder myndighetens interna system?","expected_sources":[],"expected_abstained":true}
+{"id":"unsupported-03","question":"Vilka personuppgifter finns om en namngiven privatperson i myndigheternas register?","expected_sources":[],"expected_abstained":true}
