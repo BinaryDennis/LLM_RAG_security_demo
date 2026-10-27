@@ -14,7 +14,7 @@
 ## Verify
 
 - `uv run ruff check .`
-- `uv run mypy src`
+- `uv run mypy src evals security/promptfoo_target.py`
 - `uv run pytest -q`
 - Optional real embedding download: `RUN_MODEL_SMOKE=1 uv run pytest tests/test_embeddings_smoke.py -q`
 - Optional local API evaluation: set `EVAL_BEARER_TOKEN` to a demo token and run

@@ -40,6 +40,8 @@ No classified, private, or FRA information belongs in this demo.
 - Public principal asks for a restricted-demo chunk: SQL returns no restricted chunk.
 - Retrieved text contains instructions: treat it as data, not authority; do not expose tools.
 - No matching chunks: return `answer: null`, no citations, and `abstained: true`.
+- Chunks retrieved but the model replies `INSUFFICIENT_EVIDENCE`: same abstention response. Any
+  reply containing the sentinel abstains, so a manipulated reply can only cause a refusal.
 - Provider/database unavailable: return generic 503 without exception details.
 - Trace exporter unavailable: log a generic warning and continue the query.
 

@@ -1,11 +1,12 @@
 import json
 import os
+from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 
-def call_api(prompt: str, options: dict, context: dict) -> dict[str, str]:
+def call_api(prompt: str, options: dict[str, Any], context: dict[str, Any]) -> dict[str, str]:
     config = options.get("config", {})
     url = os.environ.get(
         "SECURE_RAG_TARGET_URL",

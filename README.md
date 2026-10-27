@@ -14,7 +14,7 @@ docker compose up -d db          # Postgres 16 + pgvector on 127.0.0.1:5432
 uv sync --locked                 # install pinned dependencies
 uv run alembic upgrade head      # create tables
 uv run pytest -q                 # run tests
-uv run ruff check . && uv run mypy src
+uv run ruff check . && uv run mypy src evals security/promptfoo_target.py
 ```
 
 Ingest a reviewed public document (see `data/sources/README.md`):
@@ -52,13 +52,17 @@ Optional Promptfoo probes run against the loopback API only:
 
 ```bash
 PROMPTFOO_DISABLE_SHARING=true \
-PROMPTFOO_DISABLE_REMOTE_GENERATION=true \
 PROMPTFOO_BEARER_TOKEN=YOUR_LOCAL_DEMO_TOKEN \
-npx promptfoo redteam run -c security/promptfoo.yaml
+npx promptfoo@0.125.1 redteam run -c security/promptfoo.yaml --force
 ```
 
-Promptfoo uses the local Ollama model for probe generation and grading; remote generation is
-disabled. The scanner cannot add malicious documents to the corpus, and a single run uses one role token.
+The first run asks for email verification. Two plugins (`indirect-prompt-injection`,
+`rag-document-exfiltration`) need Promptfoo's cloud to write their probes, so this sends the
+scan's `purpose` text and plugin settings to `api.promptfoo.app`. Tokens stay local, and the corpus
+is public. For a fully local, partial scan, add `PROMPTFOO_DISABLE_REMOTE_GENERATION=true`; those
+two plugins then produce no probes.
+
+Local Ollama grades the replies and writes the probes for the other plugins. The scanner cannot add malicious documents to the corpus, and a single run uses one role token.
 Prompt-injection and cross-role guarantees are therefore primarily verified by deterministic tests.
 See [evaluation limitations](docs/evaluation.md), the [threat model](docs/threat-model.md), and
 the [risk register](docs/risk-register.md). A passing probe is not proof of security.
@@ -217,9 +221,8 @@ Reading the numbers (⇄ means FastAPI sends a request and gets a reply):
 #### How the system is tested and verified
 
 Testing happens in three layers. Each layer catches different problems, and none of them alone
-proves the system is secure. All three are built, but only Layer 1 has been run so far. Layers 2
-and 3 are designed to run against the live API and have not been executed yet (see **Status**
-below).
+proves the system is secure. Layers 1 and 2 have been run and pass; Layer 3 has had a partial
+run (see **Status** below).
 
 ```
   Layer 1: automated tests        Layer 2: evaluation set        Layer 3: Promptfoo red team
@@ -232,7 +235,7 @@ below).
   │                      │        │ citations, abstention│       │ bypass, injection    │
   └──────────────────────┘        └──────────────────────┘       └──────────────────────┘
    strongest guarantees            answer quality                 extra evidence, not proof
-   status: run, passing            status: built, not run yet     status: built, not run yet
+   status: run, passing            status: run, 28/28             status: partial run
 ```
 
 **Layer 1: automated tests (`tests/`).** Run with `uv run pytest -q`; GitHub Actions also runs
@@ -244,6 +247,7 @@ are the same every time and need no network. Key security checks:
 | Missing or wrong token gets 401 | `test_auth.py`, `test_query_api.py` |
 | Public role never receives restricted chunks, even the best match | `test_retrieval.py`, `test_query_api.py` |
 | Citations come only from retrieved chunks; empty retrieval abstains without calling the model | `test_answering.py` |
+| Model's `INSUFFICIENT_EVIDENCE` reply becomes an abstention with no answer or citations | `test_answering.py` |
 | Retrieved text is marked untrusted (prompt-injection defence) | `test_answering.py` |
 | Bad input gets 422; database/model failures get 503 without internal details | `test_query_api.py` |
 | Traces contain metadata only, never question, chunk text or answer | `test_tracing.py` |
@@ -252,8 +256,13 @@ are the same every time and need no network. Key security checks:
 **Layer 2: evaluation set (`evals/`).** `public_questions.jsonl` holds 23 questions the eight ingested
 public sources can answer (at least two per source) and 5 they cannot. When run against the live API, `evals.evaluate`
 sends each question and checks that supported questions cite the expected source URL and that
-unsupported questions abstain with no answer and no citations. The set and evaluator exist, but
-no live run has happened yet.
+unsupported questions abstain with no answer and no citations. The live run passes 28/28.
+
+Abstaining has two layers. If retrieval finds nothing, the API abstains without calling the model.
+If it finds chunks that do not answer the question, the model is told to reply only
+`INSUFFICIENT_EVIDENCE`, and the API turns that into `abstained: true` with no answer and no
+citations. Similarity scores alone could not do this: unrelated questions scored as close as
+answerable ones.
 
 **Layer 3: Promptfoo red team (`security/`).** Promptfoo is an automated attacker for LLM apps,
 similar to a penetration test. A run:
@@ -269,10 +278,12 @@ The config uses four attack plugins: indirect prompt injection, personal-data le
 role bypass (`rbac`) and raw document extraction (`rag-document-exfiltration`).
 
 What the README's Promptfoo note means:
-- **Local Ollama generates the probes.** `redteam.provider: ollama:chat:llama3.1` uses the model on
-  your machine, and `PROMPTFOO_DISABLE_REMOTE_GENERATION=true` stops Promptfoo's cloud service
-  from writing attacks. `PROMPTFOO_DISABLE_SHARING=true` stops results being uploaded. This is not
-  fully offline: `npx` downloads Promptfoo, and Promptfoo telemetry is not disabled.
+- **Mostly local, partly cloud.** `redteam.provider: ollama:chat:llama3.1` grades replies and
+  writes most probes on your machine. Two plugins need Promptfoo's cloud to write probes, which
+  sends the scan description and plugin settings (no tokens, no private data). Setting
+  `PROMPTFOO_DISABLE_REMOTE_GENERATION=true` keeps everything local but skips those two plugins.
+  `PROMPTFOO_DISABLE_SHARING=true` stops results being uploaded. `npx` downloads Promptfoo, and
+  Promptfoo telemetry is not disabled.
 - **It cannot add malicious documents.** Promptfoo only sends questions (`{"question": ...}`). It
   cannot plant a poisoned document in the database, so document-based prompt injection is mainly
   covered by Layer 1.
@@ -281,9 +292,9 @@ What the README's Promptfoo note means:
 
 **Status:**
 - **Layer 1:** run, and passing.
-- **Layers 2 and 3:** the question set, evaluator and Promptfoo config are built but have not been
-  executed. They need the public sources ingested and the API running first. No results exist
-  yet. See [docs/evaluation.md](docs/evaluation.md).
+- **Layer 2:** run against the live API with Ollama `llama3.1`: 28/28 on three runs in a row.
+- **Layer 3:** a local-only run passed 20/20 probes, but two plugins produced none. The run with
+  cloud generation is pending. See [docs/evaluation.md](docs/evaluation.md).
 
 ### 5. Where to look first
 

@@ -68,8 +68,8 @@ designed to execute; the "Status" column records whether it actually has.
 | Layer | What runs | Needs | Verifies | Status |
 |---|---|---|---|---|
 | 1. Automated tests | `uv run pytest -q` (also in CI with Ruff and mypy) | Postgres only; fake model and embedder | Security controls, deterministically | Run; passing |
-| 2. Evaluation set | `uv run python -m evals.evaluate` | Running API, Ollama, ingested sources | Citations and abstention on 28 Swedish questions | Run; 23/28 passed, all 5 unsupported cases failed |
-| 3. Promptfoo red team | `npx promptfoo redteam run -c security/promptfoo.yaml` | Running API, Ollama | Resistance to generated attack prompts | Partial; 20 generated probes passed, 2 plugins could not generate tests |
+| 2. Evaluation set | `uv run python -m evals.evaluate` | Running API, Ollama, ingested sources | Citations and abstention on 28 Swedish questions | Run; 28/28 on three consecutive runs |
+| 3. Promptfoo red team | `npx promptfoo redteam run -c security/promptfoo.yaml` | Running API, Ollama | Resistance to generated attack prompts | Partial; local-only run 20/20, run with cloud generation pending |
 
 ### Layer 1: automated tests
 
@@ -91,7 +91,7 @@ unsupported questions. The evaluator
 checks that supported answers cite the expected `source_url` from `evals/sources.json`, and that
 unsupported questions return `abstained: true`, a null answer and no citations. Ingestion must use
 the exact URLs in `evals/sources.json`. The live run returned the expected citation for all 23
-supported cases, but all 5 unsupported cases returned citations instead of abstaining; see
+supported cases, and all 5 unsupported cases abstain via the answerability gate; see
 [evaluation results](evaluation.md).
 
 ### Layer 3: Promptfoo red team
@@ -102,10 +102,15 @@ fail. Plugins: `indirect-prompt-injection`, `pii:direct`, `rbac` and `rag-docume
 with the `jailbreak-templates` strategy.
 
 Boundaries of this layer:
-- **Local generation:** `redteam.provider` is local Ollama (`llama3.1`).
-  `PROMPTFOO_DISABLE_REMOTE_GENERATION=true` disables Promptfoo's cloud probe generation and
+- **Generation:** `redteam.provider` is local Ollama (`llama3.1`), which grades replies and writes
+  most probes. `indirect-prompt-injection` and `rag-document-exfiltration` need Promptfoo's cloud
+  generation, which receives the scan `purpose` and plugin settings (no tokens; public corpus).
+  `PROMPTFOO_DISABLE_REMOTE_GENERATION=true` makes the scan fully local but skips those two plugins.
   `PROMPTFOO_DISABLE_SHARING=true` prevents uploading results. Downloading Promptfoo via `npx`
   still needs the network, and Promptfoo telemetry is not disabled.
+- **Indirect injection is not delivered:** that plugin places its payload in a `context` variable.
+  The target forwards only the question, so the payload never reaches the API. Its passes are not
+  evidence about document-borne injection.
 - **Loopback only:** the target accepts only `http` on `127.0.0.1`, `localhost` or `::1`.
 - **No corpus poisoning:** the target sends only `{"question": ...}`. Promptfoo cannot insert a
   malicious document, so document-borne injection is primarily verified by Layer 1.
@@ -114,15 +119,15 @@ Boundaries of this layer:
 
 ### Current status
 
-- **Layer 1:** executed; 47 tests pass and 1 is skipped. Ruff and mypy pass locally.
-- **Layer 2:** executed; 23/28 cases pass. The API currently does not abstain on the five
-  unsupported questions.
-- **Layer 3:** partial live run; all 20 generated probes pass, but two configured plugins cannot
-  generate probes while remote generation is disabled. See [evaluation results](evaluation.md).
+- **Layer 1:** executed; 53 tests pass and 1 is skipped. Ruff and mypy pass locally.
+- **Layer 2:** executed; 28/28 cases pass on three consecutive runs.
+- **Layer 3:** the local-only run passed all 20 generated probes, but two plugins produced none.
+  The run with cloud generation is pending. See [evaluation results](evaluation.md).
 
 ## Deliberate limitations
 
 This prototype has no production identity provider, rate limiting, encryption-at-rest policy,
-high availability, answerability check, or independent answer-claim verifier.
-An LLM can still produce unsupported text despite the grounding prompt. Passing tests is evidence
+high availability, or independent answer-claim verifier. The answerability gate relies on the
+LLM obeying an instruction, not on a separate classifier. An LLM can still produce unsupported
+text despite the grounding prompt. Passing tests is evidence
 for specific controls, not proof that the system is secure.

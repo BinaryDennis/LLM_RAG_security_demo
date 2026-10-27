@@ -2,6 +2,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Any
 from urllib.error import URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
@@ -11,10 +12,10 @@ API_URL = os.environ.get("SECURE_RAG_TARGET_URL", "http://127.0.0.1:8000/v1/quer
 
 
 def evaluate_response(
-    case: dict[str, object], response: dict[str, object], source_ids: dict[str, str]
+    case: dict[str, Any], response: dict[str, object], source_ids: dict[str, str]
 ) -> list[str]:
     expected_abstained = case["expected_abstained"]
-    expected_sources = set(case["expected_sources"])  # type: ignore[arg-type]
+    expected_sources = set(case["expected_sources"])
     citations = response.get("citations", [])
     if not isinstance(citations, list):
         return ["citations is not a list"]
@@ -51,7 +52,9 @@ def main() -> int:
         return 2
 
     source_ids: dict[str, str] = json.loads((ROOT / "sources.json").read_text())
-    cases = [json.loads(line) for line in (ROOT / "public_questions.jsonl").read_text().splitlines()]
+    cases = [
+        json.loads(line) for line in (ROOT / "public_questions.jsonl").read_text().splitlines()
+    ]
     failures = 0
     for case in cases:
         req = Request(

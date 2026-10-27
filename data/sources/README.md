@@ -32,3 +32,5 @@ supported question; `tests/test_evaluation.py` fails otherwise.
    evaluation only matches citations by these stable page URLs.
 4. Ingest with
    `uv run python -m secure_rag_demo.ingest_cli FILE --title T --url URL --version V`.
+   A header that starts with `Source: ` and ends with a `---` line is stripped before embedding,
+   so provenance and licence notes are not indexed as content.
