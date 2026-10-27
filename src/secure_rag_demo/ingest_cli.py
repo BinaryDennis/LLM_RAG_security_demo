@@ -3,7 +3,7 @@ from pathlib import Path
 
 from secure_rag_demo.db import make_engine, make_session_factory
 from secure_rag_demo.embeddings import FastEmbedService
-from secure_rag_demo.ingest import ingest_document
+from secure_rag_demo.ingest import ingest_document, strip_provenance_header
 from secure_rag_demo.schemas import DocumentInput
 
 
@@ -21,7 +21,7 @@ def main() -> None:
         source_url=args.url,
         version=args.version,
         visibility=args.visibility,
-        text=args.file.read_text(encoding="utf-8"),
+        text=strip_provenance_header(args.file.read_text(encoding="utf-8")),
     )
     factory = make_session_factory(make_engine())
     with factory.begin() as session:

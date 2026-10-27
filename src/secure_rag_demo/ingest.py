@@ -13,6 +13,17 @@ CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 150
 
 
+PROVENANCE_PREFIX = "Source: "
+PROVENANCE_SEPARATOR = "\n---\n"
+
+
+def strip_provenance_header(text: str) -> str:
+    """Drop the local provenance header (Source, licence notes) so it is not embedded as content."""
+    if not text.startswith(PROVENANCE_PREFIX) or PROVENANCE_SEPARATOR not in text:
+        return text
+    return text.split(PROVENANCE_SEPARATOR, 1)[1].lstrip("\n")
+
+
 def normalize_text(text: str) -> str:
     text = unicodedata.normalize("NFC", text)
     return re.sub(r"\s+", " ", text).strip()

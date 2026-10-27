@@ -5,9 +5,9 @@
 {"id":"digg-01","question":"Vilken europeisk standard för digital tillgänglighet hänvisar Digg till?","expected_sources":["digg_digital_tillganglighet"],"expected_abstained":false}
 {"id":"digg-02","question":"Vilken version av WCAG nämns på Diggs sida om digital tillgänglighet?","expected_sources":["digg_digital_tillganglighet"],"expected_abstained":false}
 {"id":"digg-03","question":"Omfattas mobila applikationer av kraven på digital tillgänglighet enligt Digg?","expected_sources":["digg_digital_tillganglighet"],"expected_abstained":false}
-{"id":"mcf-01","question":"Vad är MCF:s fullständiga namn?","expected_sources":["mcf_radinformation"],"expected_abstained":false}
-{"id":"mcf-02","question":"Vilken typ av information finns på MCF:s webbplats enligt sidan?","expected_sources":["mcf_radinformation"],"expected_abstained":false}
-{"id":"mcf-03","question":"Vilka exempel på andra webbplatser nämner MCF-sidan?","expected_sources":["mcf_radinformation"],"expected_abstained":false}
+{"id":"mcf-01","question":"Vilka ämnen ger MCF exempel på i sina råd till privatpersoner?","expected_sources":["mcf_radinformation"],"expected_abstained":false}
+{"id":"mcf-02","question":"Vad heter MCF:s broschyr om kris och krig?","expected_sources":["mcf_radinformation"],"expected_abstained":false}
+{"id":"mcf-03","question":"Har MCF råd till privatpersoner om brandsäkerhet?","expected_sources":["mcf_radinformation"],"expected_abstained":false}
 {"id":"mcf-hem-01","question":"Hur länge bör man kunna klara sig hemma enligt MCF:s råd om hemberedskap?","expected_sources":["mcf_grunder_i_hemberedskap"],"expected_abstained":false}
 {"id":"mcf-hem-02","question":"Vilka saker finns med på MCF:s checklista för hemberedskap?","expected_sources":["mcf_grunder_i_hemberedskap"],"expected_abstained":false}
 {"id":"mcf-hem-03","question":"Varför rekommenderar MCF minst en vecka i stället för 72 timmar?","expected_sources":["mcf_grunder_i_hemberedskap"],"expected_abstained":false}

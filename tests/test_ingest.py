@@ -2,7 +2,13 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from secure_rag_demo.ingest import chunk_text, content_hash, ingest_document, normalize_text
+from secure_rag_demo.ingest import (
+    chunk_text,
+    content_hash,
+    ingest_document,
+    normalize_text,
+    strip_provenance_header,
+)
 from secure_rag_demo.models import Document, DocumentChunk
 from secure_rag_demo.schemas import DocumentInput
 from tests.conftest import FakeEmbedder
@@ -56,3 +62,18 @@ def test_duplicate_ingestion_returns_zero(session: Session) -> None:
     assert ingest_document(session, doc, FakeEmbedder()) == 0
     assert session.scalar(select(func.count()).select_from(Document)) == 1
     assert session.scalar(select(func.count()).select_from(DocumentChunk)) == first
+
+
+def test_provenance_header_is_stripped() -> None:
+    text = "Source: https://example.se\n\nLicence status: none\n\n---\n\n# Titel\n\nBrödtext."
+    assert strip_provenance_header(text) == "# Titel\n\nBrödtext."
+
+
+def test_text_without_header_is_unchanged() -> None:
+    text = "# Titel\n\nFörsta delen.\n\n---\n\nAndra delen."
+    assert strip_provenance_header(text) == text
+
+
+def test_header_without_separator_is_unchanged() -> None:
+    text = "Source: https://example.se\n\nInget avgränsningsstreck."
+    assert strip_provenance_header(text) == text

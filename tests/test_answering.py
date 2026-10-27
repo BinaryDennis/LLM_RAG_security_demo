@@ -1,6 +1,11 @@
 import uuid
 
-from secure_rag_demo.answering import SYSTEM_PROMPT, answer_question, build_user_prompt
+from secure_rag_demo.answering import (
+    NO_ANSWER,
+    SYSTEM_PROMPT,
+    answer_question,
+    build_user_prompt,
+)
 from secure_rag_demo.retrieval import RetrievedChunk
 
 
@@ -49,3 +54,19 @@ def test_injection_text_is_marked_untrusted_and_system_prompt_warns() -> None:
     assert user.startswith("<sources>") and evil in user.split("</sources>")[0]
     assert build_user_prompt("Fråga?", [chunk(evil)]).endswith("Question: Fråga?")
     assert SYSTEM_PROMPT == system
+
+
+def test_model_insufficient_evidence_reply_abstains() -> None:
+    provider = FakeProvider(NO_ANSWER)
+    answer, citations, abstained = answer_question("Fråga?", [chunk()], provider)
+    assert (answer, citations, abstained) == (None, [], True)
+    assert len(provider.calls) == 1
+
+
+def test_sentinel_with_extra_text_still_abstains() -> None:
+    provider = FakeProvider(f"Källorna saknar svar. {NO_ANSWER}.")
+    assert answer_question("Fråga?", [chunk()], provider) == (None, [], True)
+
+
+def test_system_prompt_defines_sentinel() -> None:
+    assert NO_ANSWER in SYSTEM_PROMPT
