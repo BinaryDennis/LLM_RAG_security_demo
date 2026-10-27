@@ -1,17 +1,24 @@
 from collections.abc import Iterator
 
 import pytest
+from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from secure_rag_demo.db import make_engine
+from secure_rag_demo.models import Document
 
 
 @pytest.fixture
 def session() -> Iterator[Session]:
-    """DB session that rolls back everything; requires `alembic upgrade head`."""
+    """Empty-DB session that rolls back everything; requires `alembic upgrade head`.
+
+    Locally ingested documents are deleted inside the test transaction, so each test starts
+    empty and the rollback restores them.
+    """
     engine = make_engine()
     connection = engine.connect()
     transaction = connection.begin()
+    connection.execute(delete(Document))
     db = Session(connection, join_transaction_mode="create_savepoint")
     try:
         yield db
