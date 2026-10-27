@@ -52,11 +52,13 @@ Optional Promptfoo probes run against the loopback API only:
 
 ```bash
 PROMPTFOO_DISABLE_SHARING=true \
+PROMPTFOO_DISABLE_REMOTE_GENERATION=true \
 PROMPTFOO_BEARER_TOKEN=YOUR_LOCAL_DEMO_TOKEN \
 npx promptfoo redteam run -c security/promptfoo.yaml
 ```
 
-The scanner cannot add malicious documents to the corpus, and a single run uses one role token.
+Promptfoo uses the local Ollama model for probe generation and grading; remote generation is
+disabled. The scanner cannot add malicious documents to the corpus, and a single run uses one role token.
 Prompt-injection and cross-role guarantees are therefore primarily verified by deterministic tests.
 See [evaluation limitations](docs/evaluation.md), the [threat model](docs/threat-model.md), and
 the [risk register](docs/risk-register.md). A passing probe is not proof of security.

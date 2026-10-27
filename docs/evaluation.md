@@ -25,9 +25,13 @@ URLs and reads its token from `PROMPTFOO_BEARER_TOKEN`. Sharing is disabled for 
 
 ```bash
 PROMPTFOO_DISABLE_SHARING=true \
+PROMPTFOO_DISABLE_REMOTE_GENERATION=true \
 PROMPTFOO_BEARER_TOKEN=demo-public-token-change-me \
 npx promptfoo redteam run -c security/promptfoo.yaml
 ```
+
+The configuration uses local Ollama (`llama3.1`) for attack generation and grading, and the command
+disables remote generation and result sharing.
 
 The configuration validates with Promptfoo 0.125.1. A live red-team scan has not yet been run:
 the local Ollama server is not running and the selected source pages have not yet been ingested.
