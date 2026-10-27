@@ -62,13 +62,14 @@ client or database.
 ## Testing and verification
 
 Verification has three layers. Each covers different risks; passing all of them is evidence for
-specific controls, not proof of security.
+specific controls, not proof of security. The "What runs" column describes how each layer is
+designed to execute; the "Status" column records whether it actually has.
 
-| Layer | What runs | Needs | Verifies |
-|---|---|---|---|
-| 1. Automated tests | `uv run pytest -q` (also in CI with Ruff and mypy) | Postgres only; fake model and embedder | Security controls, deterministically |
-| 2. Evaluation set | `uv run python -m evals.evaluate` | Running API, Ollama, ingested sources | Citations and abstention on 13 Swedish questions |
-| 3. Promptfoo red team | `npx promptfoo redteam run -c security/promptfoo.yaml` | Running API, Ollama | Resistance to generated attack prompts |
+| Layer | What runs | Needs | Verifies | Status |
+|---|---|---|---|---|
+| 1. Automated tests | `uv run pytest -q` (also in CI with Ruff and mypy) | Postgres only; fake model and embedder | Security controls, deterministically | Run; passing |
+| 2. Evaluation set | `uv run python -m evals.evaluate` | Running API, Ollama, ingested sources | Citations and abstention on 13 Swedish questions | Built; not yet executed |
+| 3. Promptfoo red team | `npx promptfoo redteam run -c security/promptfoo.yaml` | Running API, Ollama | Resistance to generated attack prompts | Built; not yet executed |
 
 ### Layer 1: automated tests
 
@@ -88,7 +89,8 @@ specific controls, not proof of security.
 `evals/public_questions.jsonl` contains 10 supported and 3 unsupported questions. The evaluator
 checks that supported answers cite the expected `source_url` from `evals/sources.json`, and that
 unsupported questions return `abstained: true`, a null answer and no citations. Ingestion must use
-the exact URLs in `evals/sources.json`.
+the exact URLs in `evals/sources.json`. The dataset and evaluator are implemented; no live run has
+been executed yet.
 
 ### Layer 3: Promptfoo red team
 
@@ -110,8 +112,10 @@ Boundaries of this layer:
 
 ### Current status
 
-Layer 1 passes locally. Layers 2 and 3 have not been run live yet because the public sources are
-not ingested. Results and limitations will be recorded in [evaluation.md](evaluation.md).
+- **Layer 1:** executed; passes locally.
+- **Layers 2 and 3:** implemented but not executed. Both require the reviewed public sources to be
+  ingested and the API to be running. No live results exist yet; they will be recorded with their
+  limitations in [evaluation.md](evaluation.md).
 
 ## Deliberate limitations
 

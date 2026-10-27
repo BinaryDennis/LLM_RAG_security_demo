@@ -217,19 +217,22 @@ Reading the numbers (⇄ means FastAPI sends a request and gets a reply):
 #### How the system is tested and verified
 
 Testing happens in three layers. Each layer catches different problems, and none of them alone
-proves the system is secure.
+proves the system is secure. All three are built, but only Layer 1 has been run so far. Layers 2
+and 3 are designed to run against the live API and have not been executed yet (see **Status**
+below).
 
 ```
   Layer 1: automated tests        Layer 2: evaluation set        Layer 3: Promptfoo red team
   (pytest, every push in CI)      (evals/evaluate.py)            (security/promptfoo.yaml)
   ┌──────────────────────┐        ┌──────────────────────┐       ┌──────────────────────┐
   │ fake model + fake    │        │ 13 Swedish questions │       │ LLM-written attack   │
-  │ embedder, real       │        │ against the running  │       │ prompts against the  │
-  │ Postgres             │        │ API + real Ollama    │       │ running API          │
-  │ fast, deterministic  │        │ checks citations and │       │ checks leaks, role   │
-  │                      │        │ abstention           │       │ bypass, injection    │
+  │ embedder, real       │        │ to send to the       │       │ prompts to send to   │
+  │ Postgres             │        │ running API + real   │       │ the running API      │
+  │ fast, deterministic  │        │ Ollama; checks       │       │ checks leaks, role   │
+  │                      │        │ citations, abstention│       │ bypass, injection    │
   └──────────────────────┘        └──────────────────────┘       └──────────────────────┘
    strongest guarantees            answer quality                 extra evidence, not proof
+   status: run, passing            status: built, not run yet     status: built, not run yet
 ```
 
 **Layer 1: automated tests (`tests/`).** Run with `uv run pytest -q`; GitHub Actions also runs
@@ -247,9 +250,10 @@ are the same every time and need no network. Key security checks:
 | Promptfoo target refuses non-local URLs and requires a token | `test_promptfoo_target.py` |
 
 **Layer 2: evaluation set (`evals/`).** `public_questions.jsonl` holds 10 questions the ingested
-public sources can answer and 3 they cannot. With the API running, `evals.evaluate` sends each
-question and checks that supported questions cite the expected source URL and that unsupported
-questions abstain with no answer and no citations.
+public sources can answer and 3 they cannot. When run against the live API, `evals.evaluate`
+sends each question and checks that supported questions cite the expected source URL and that
+unsupported questions abstain with no answer and no citations. The set and evaluator exist, but
+no live run has happened yet.
 
 **Layer 3: Promptfoo red team (`security/`).** Promptfoo is an automated attacker for LLM apps,
 similar to a penetration test. A run:
@@ -275,8 +279,11 @@ What the README's Promptfoo note means:
 - **One run uses one role token** (`PROMPTFOO_BEARER_TOKEN`). It cannot compare public and
   restricted users in the same run, so role separation is mainly covered by Layer 1.
 
-**Status:** Layer 1 passes. Layers 2 and 3 have not been run live yet, because the public sources
-are not ingested. See [docs/evaluation.md](docs/evaluation.md).
+**Status:**
+- **Layer 1:** run, and passing.
+- **Layers 2 and 3:** the question set, evaluator and Promptfoo config are built but have not been
+  executed. They need the public sources ingested and the API running first. No results exist
+  yet. See [docs/evaluation.md](docs/evaluation.md).
 
 ### 5. Where to look first
 
