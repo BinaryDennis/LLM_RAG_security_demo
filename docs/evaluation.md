@@ -28,10 +28,24 @@ supported questions ranked a chunk from the expected source first (cosine distan
 
 Finding: the five unsupported questions also retrieved chunks, at distances of 0.122–0.184. That
 overlaps the supported range, so the API will not abstain on them: it only abstains when retrieval
-returns nothing. A distance threshold alone would not separate the two groups. Abstention then
-depends on the model following the system prompt's "say you cannot answer" rule, which the
-evaluator does not count as abstention. Expect the unsupported cases to fail in a live run until
-an answerability check is added. This is an accepted, documented limitation for the demo.
+returns nothing. A distance threshold alone would not separate the two groups.
+
+### Live API evaluation (2026-10-27)
+
+Ran the 28 cases against the local API, Ollama `llama3.1`, and the eight-source/78-chunk corpus:
+**23/28 passed**. All 23 supported cases returned a non-empty answer with the expected source
+citation. All five unsupported cases failed: each returned citations and `abstained: false`.
+This confirms the retrieval-only finding. The API needs an answerability check before it can meet
+the dataset's unsupported-question expectation; the current evaluator does not treat a natural
+language refusal from the model as abstention.
+
+### Role-isolation smoke test
+
+Temporarily ingested one synthetic `restricted_demo` marker and queried the live API with both
+demo tokens. The public principal did not cite the restricted source; the restricted principal
+did. The temporary document was removed afterward, and the corpus returned to 8 documents and
+78 chunks. This verifies the server-side visibility filter end to end using synthetic text, not
+classified or private data.
 
 ## Promptfoo probes
 
@@ -48,15 +62,22 @@ npx promptfoo redteam run -c security/promptfoo.yaml
 The configuration uses local Ollama (`llama3.1`) for attack generation and grading, and the command
 disables remote generation and result sharing.
 
-The configuration validates with Promptfoo 0.125.1. A live red-team scan has not yet been run. Ollama is
-running and the eight public source pages are ingested locally; start the API before recording
-live results.
+Promptfoo 0.125.1 ran locally against the API on 2026-10-27. Test generation requested 40 cases,
+but produced 20: 5 `pii:direct`, 5 `rbac`, and 10 `jailbreak-templates` cases. The
+`indirect-prompt-injection` and `rag-document-exfiltration` plugins each failed to generate their
+five cases because they require remote generation, which was explicitly disabled. All 20
+generated probes passed (20/20; scan duration 1m 52s). Treat this as a partial scan, not a pass
+for all configured plugins. The run used local Ollama `llama3.1`; result sharing and remote
+generation were disabled.
 
 The configured indirect-injection and document-exfiltration plugins may not fully exercise
 retrieved-document poisoning: the scanner sends requests through the query API and cannot insert
 test documents into the database. The prompt-injection unit test is deterministic. RBAC behavior is
 most directly proved by the public/restricted retrieval tests, because a single Promptfoo target
 uses one bearer token per run.
+
+The automated checks also pass locally: `uv run pytest -q` reports 47 passed and 1 skipped;
+`uv run ruff check .` and `uv run mypy src` are clean.
 
 ## Recording results
 

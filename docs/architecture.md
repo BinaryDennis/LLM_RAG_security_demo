@@ -68,8 +68,8 @@ designed to execute; the "Status" column records whether it actually has.
 | Layer | What runs | Needs | Verifies | Status |
 |---|---|---|---|---|
 | 1. Automated tests | `uv run pytest -q` (also in CI with Ruff and mypy) | Postgres only; fake model and embedder | Security controls, deterministically | Run; passing |
-| 2. Evaluation set | `uv run python -m evals.evaluate` | Running API, Ollama, ingested sources | Citations and abstention on 28 Swedish questions | Built; not yet executed |
-| 3. Promptfoo red team | `npx promptfoo redteam run -c security/promptfoo.yaml` | Running API, Ollama | Resistance to generated attack prompts | Built; not yet executed |
+| 2. Evaluation set | `uv run python -m evals.evaluate` | Running API, Ollama, ingested sources | Citations and abstention on 28 Swedish questions | Run; 23/28 passed, all 5 unsupported cases failed |
+| 3. Promptfoo red team | `npx promptfoo redteam run -c security/promptfoo.yaml` | Running API, Ollama | Resistance to generated attack prompts | Partial; 20 generated probes passed, 2 plugins could not generate tests |
 
 ### Layer 1: automated tests
 
@@ -90,8 +90,9 @@ designed to execute; the "Status" column records whether it actually has.
 unsupported questions. The evaluator
 checks that supported answers cite the expected `source_url` from `evals/sources.json`, and that
 unsupported questions return `abstained: true`, a null answer and no citations. Ingestion must use
-the exact URLs in `evals/sources.json`. The dataset and evaluator are implemented; no live run has
-been executed yet.
+the exact URLs in `evals/sources.json`. The live run returned the expected citation for all 23
+supported cases, but all 5 unsupported cases returned citations instead of abstaining; see
+[evaluation results](evaluation.md).
 
 ### Layer 3: Promptfoo red team
 
@@ -113,14 +114,15 @@ Boundaries of this layer:
 
 ### Current status
 
-- **Layer 1:** executed; passes locally.
-- **Layers 2 and 3:** implemented but not executed. Both require the reviewed public sources to be
-  ingested and the API to be running. No live results exist yet; they will be recorded with their
-  limitations in [evaluation.md](evaluation.md).
+- **Layer 1:** executed; 47 tests pass and 1 is skipped. Ruff and mypy pass locally.
+- **Layer 2:** executed; 23/28 cases pass. The API currently does not abstain on the five
+  unsupported questions.
+- **Layer 3:** partial live run; all 20 generated probes pass, but two configured plugins cannot
+  generate probes while remote generation is disabled. See [evaluation results](evaluation.md).
 
 ## Deliberate limitations
 
 This prototype has no production identity provider, rate limiting, encryption-at-rest policy,
-high availability, calibrated semantic abstention threshold, or independent answer-claim verifier.
+high availability, answerability check, or independent answer-claim verifier.
 An LLM can still produce unsupported text despite the grounding prompt. Passing tests is evidence
 for specific controls, not proof that the system is secure.
