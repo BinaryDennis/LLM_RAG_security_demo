@@ -231,12 +231,53 @@ Reading the numbers (⇄ means FastAPI sends a request and gets a reply):
 6. FastAPI records a trace with metadata only (request ID, role, chunk count, model, duration).
 7. FastAPI returns the answer and citations. The client never sees raw chunks, prompts or internal errors.
 
+```
+   PER QUESTION: READ-ONLY AGENT (built, optional). Same hub, one extra LLM round trip.
+
+                                  ┌───────────────────────┐  2. token ⇄ role    ┌──────────────┐
+  ┌────────┐ 1. question + token  │                       │ ◀─────────────────▶ │ Auth         │
+  │        │ ───────────────────▶ │                       │                     └──────────────┘
+  │ client │                      │        FastAPI        │  3. question + tool ┌──────────────┐
+  │        │ ◀─────────────────── │ POST /v1/agent-query  │     ⇄ tool call     │ LLM          │
+  └────────┘ 8. answer +          │    (orchestrator)     │ ◀─────────────────▶ │ (Ollama,     │
+             citations only       │                       │                     │  local)      │
+                                  │  4. CHECK tool call:  │                     └──────────────┘
+                                  │  one call, allowed    │  5. search text ⇄   ┌──────────────┐
+                                  │  name, valid schema   │     vector          │ Embedder     │
+                                  │                       │ ◀─────────────────▶ │ (local)      │
+                                  │                       │                     └──────────────┘
+                                  │                       │  6. vector + role ⇄ ┌──────────────┐
+                                  │                       │     top chunks      │ Postgres +   │
+                                  │                       │ ◀─────────────────▶ │ pgvector     │
+                                  │                       │  (one search only)  └──────────────┘
+                                  │                       │  7. ORIGINAL        ┌──────────────┐
+                                  │                       │     question +      │ LLM          │
+                                  │                       │     chunks ⇄ answer │ (same model) │
+                                  │                       │ ◀─────────────────▶ └──────────────┘
+                                  └───────────────────────┘  + metadata-only trace (as above)
+```
+
+Reading the agent numbers:
+1–2. Same as the query route: question, token, role.
+3. FastAPI offers the LLM exactly one tool, `search_documents`, and the LLM replies with a tool
+   call containing its own search text. No source text is sent yet.
+4. FastAPI checks the tool call: exactly one call, the allowed name, a valid argument shape. If not, 503.
+5–6. FastAPI embeds the search text and runs one search. The role still comes from the token, not
+   from the LLM, so the LLM cannot widen access.
+7. FastAPI sends the user's original question plus the allowed chunks to the LLM, using the same
+   protections as the query route.
+8. FastAPI returns the answer and citations. The whole request has a 30-second deadline.
+
+**Query vs agent in one line:** in `/v1/query` the server decides what to search for; in
+`/v1/agent-query` the LLM decides what to search for, but the server decides everything else.
+
 **Security points:**
 - The client, the database and the LLM never connect directly. Every rule is enforced in one place.
 - Role filtering happens in the SQL query, before ranking, so forbidden text never reaches the
   LLM.
 - Retrieved text is treated as untrusted: instruction-like documents are refused at ingestion,
   instruction-like sentences are redacted before the model, and a reminder follows the question.
+- The agent's tool call is treated as untrusted output and validated before anything runs.
 - Traces hold metadata only, never content.
 - Everything runs locally by default.
 

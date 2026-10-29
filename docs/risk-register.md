@@ -11,6 +11,7 @@
 | R7 | Public source text is redistributed without permission | Medium | Sources excluded from Git; record URL/version/reuse terms | Low if operator follows source instructions | Corpus curator |
 | R8 | API or model outage disrupts demo | Low | Generic 503 handling and local runbook | Low for single-user demo; no HA or recovery automation | Demo maintainer |
 | R9 | Promptfoo output is misread as proof of security | Medium | Report scope and limitations documented; unit tests remain primary evidence | Medium: automated probes are incomplete and model-dependent | Demo maintainer |
+| R10 | Agent model misuses its tool (excessive agency) | Medium | One allowlisted read-only tool; server-side validation of count, name, size and schema; role from server principal; one search; 30-second deadline; `test_agent.py`; eval 28/28 and Promptfoo 16/16 on the agent endpoint | Low: worst case is a different search within the caller's visibility, or a 503 | Demo maintainer |
 
 Severity is a qualitative prioritization for this learning prototype, not a formal organizational
 risk assessment. Reassess after changing data, models, providers, or access controls.

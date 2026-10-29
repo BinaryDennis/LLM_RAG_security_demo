@@ -49,14 +49,41 @@ are git-ignored; consult each publisher's reuse terms before storing or redistri
 The client never talks directly to Postgres or the model. The model never talks directly to the
 client or database.
 
-### Optional read-only agent
+### Optional read-only agent (per request)
 
-`POST /v1/agent-query` uses the same server-resolved principal and validated question as the
-standard query route. The model is offered exactly one function, `search_documents`; the server
-rejects any other tool or argument shape and requires exactly one call. The tool embeds the chosen
-search question locally and calls the existing `search_chunks` service once, whose SQL visibility
-predicate still runs before ranking. The agent then answers from those chunks using the existing
-grounding, citation, and abstention logic.
+`POST /v1/agent-query` returns the same response shape as `/v1/query`. The difference is that the
+model, not the server, writes the search text. Code: `src/secure_rag_demo/agent.py`.
+
+1. The client sends a question and bearer token to `POST /v1/agent-query`. Validation and token
+   to `Principal` mapping are identical to the query route.
+2. FastAPI starts a 30-second deadline and asks the model for a tool call. The model is offered
+   exactly one function, `search_documents(question)`, with `tool_choice="required"`. This first
+   model call receives no source text.
+3. The server validates the model's reply: exactly one call, the name `search_documents`,
+   arguments at most 10,000 characters and matching a strict schema (one non-blank `question`
+   string of at most 2,000 characters, no extra fields). Anything else raises `AgentToolError`.
+4. FastAPI embeds the model's search text locally and sets PostgreSQL's `statement_timeout` to the
+   remaining time.
+5. FastAPI calls the existing `search_chunks` service once. The visibility predicate comes from the
+   server-side principal, never from the model, and still runs in SQL before ranking.
+6. FastAPI calls the existing `answer_question` with the user's **original** question and the
+   authorized chunks. Redaction, the untrusted-source prompt, the reminder, the
+   `INSUFFICIENT_EVIDENCE` gate and citations all work exactly as on the query route.
+7. If tracing is enabled, FastAPI records metadata only: request ID, principal label, citation
+   count, model, duration and outcome (`answered`, `abstained`, `agent_error` or `db_error`).
+8. FastAPI returns the answer and citations, or an abstention. An invalid tool call, timeout,
+   provider error or database error returns a generic 503.
+
+| | `/v1/query` | `/v1/agent-query` |
+|---|---|---|
+| Who writes the search text | Server (the user's question) | Model (via one tool call) |
+| Model calls per request | 1 | 2 (tool call, then answer) |
+| Tools offered to the model | None | `search_documents` only |
+| Database searches | 1 | Exactly 1 |
+| Role filter | SQL, from server principal | Same SQL, same principal |
+| Question used for the final answer | User's question | User's original question |
+| Deadline | Provider timeout | 30 s total, including SQL statement timeout |
+| Failure response | 503 | 503 (also for invalid tool calls) |
 
 The agent exposes no write, browser, URL-fetch, or arbitrary network tool. Its trusted chat
 provider still receives the normal model request at the configured endpoint (localhost Ollama by
@@ -71,6 +98,10 @@ retrieval. The agent cannot change the role or bypass SQL authorization.
   Defences: ingestion screening, answer-time redaction of instruction-like sentences, `<sources>`
   tag neutralisation, the system prompt and a reminder after the question. The standard query
   route exposes no tools; the optional agent exposes only the single retrieval tool described above.
+- **Model tool call -> API (agent only):** the model's tool call is untrusted output. The server
+  checks name, count, size and schema before acting, and the model cannot choose role, limit,
+  table or SQL. The worst a manipulated tool call can do is search for different text within the
+  caller's own visibility.
 - **API -> model provider:** localhost is the default. Hosted use is opt-in and limited to public
   demo content.
 - **API -> telemetry:** tracing is opt-in, inputs and outputs are hidden, and the payload contains

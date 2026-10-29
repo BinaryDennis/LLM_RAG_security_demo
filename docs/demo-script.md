@@ -20,7 +20,11 @@
    show `tests/test_retrieval.py` and `tests/test_query_api.py`.
 6. **Show observability:** show `trace_query` and `tests/test_tracing.py`. The trace contains
    operational metadata, not request or answer content.
-7. **Show evaluation:** show the public question set, Promptfoo config, and documented limitations.
+7. **Show the optional agent:** send the same supported question to `POST /v1/agent-query`.
+   Explain that the model chooses the search text through one allowlisted tool, while the server
+   keeps the role, validates the tool call and runs one SQL-filtered search. Show `test_agent.py`.
+8. **Show evaluation:** show the public question set and Promptfoo config (both run against the query
+   and agent endpoints), and the documented limitations.
 
 ## Svenska sammanfattningen
 
