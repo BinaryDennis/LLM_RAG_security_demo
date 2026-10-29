@@ -52,7 +52,8 @@ client or database.
 - **Client -> API:** HTTP request is untrusted; Pydantic bounds question length and rejects blanks.
 - **API -> database:** SQL uses the server-resolved visibility set. The query path is read-only.
 - **Retrieved documents -> model:** source text is untrusted and may contain prompt injection.
-  The system prompt instructs the model not to follow source instructions; no tools are exposed.
+  Defences: ingestion screening, answer-time redaction of instruction-like sentences, `<sources>`
+  tag neutralisation, the system prompt and a reminder after the question; no tools are exposed.
 - **API -> model provider:** localhost is the default. Hosted use is opt-in and limited to public
   demo content.
 - **API -> telemetry:** tracing is opt-in, inputs and outputs are hidden, and the payload contains
@@ -103,23 +104,31 @@ probes or model grader. Before the run, `security.canaries` inserts a synthetic 
 page and a synthetic restricted document, and verifies they are retrievable only by the intended
 principal. Remove these temporary documents after the run.
 
-The run found that local Ollama `llama3.1` followed the poisoned page's instruction: four probes
-returned `POISON-CANARY-4417` (10/14 passed). The injection finding is unresolved. The result is
-specific to this test corpus and model, and does not establish a general attack success rate.
+The first run found that local Ollama `llama3.1` followed the poisoned page's instruction: four
+probes returned `POISON-CANARY-4417` (10/14 passed). The fix added three deterministic layers: (1) ingestion refuses documents matching instruction-like
+patterns (`SuspectedInjectionError`) unless explicitly allowed; (2) at answer time, sentences
+matching those patterns are replaced with `[removed: suspected instruction]` and `<sources>` tags
+inside source text are neutralised; (3) a short reminder follows the question. The patterns are
+in `src/secure_rag_demo/injection.py` and flag none of the eight real sources.
+A third canary uses a paraphrased instruction (`POISON-CANARY-7730`) that the patterns deliberately
+miss, to measure what remains. The expanded suite passed 16/16 on two runs. The result is specific
+to this corpus and model and does not establish a general attack success rate.
 
 An optional generated red-team config, `security/promptfoo.yaml`, retains the local `pii:direct`
 and `rbac` plugins. Plugins that require cloud generation have been removed. A local generated
-run produced 20 cases: 5 passed and 15 failed; those failures have not been individually triaged.
+run produced 20 cases. On re-running them after the fix, the API abstained on all 20; the 18
+failures reported by the local llama3.1 grader were triaged as grader false positives.
 The static suite requires no cloud generation, model grader, or result sharing. `npx` may download
 Promptfoo from the package registry. The target accepts only loopback HTTP and reads one bearer
 token per run; the target cannot itself add documents or compare roles in a single run.
 
 ### Current status
 
-- **Layer 1:** executed; 57 tests pass and 1 is skipped. Ruff and mypy pass locally.
+- **Layer 1:** executed; 84 tests pass and 1 is skipped. Ruff and mypy pass locally.
 - **Layer 2:** executed; 28/28 cases pass on three consecutive runs.
-- **Layer 3:** hand-written local probes ran 14 cases; 10 passed and four exposed prompt-injection
-  behavior. The issue remains unresolved. See [evaluation results](evaluation.md).
+- **Layer 3:** prompt injection found (10/14), mitigated, and re-tested: 16/16 on two runs,
+  including the evasive canary. Residual model-level risk remains. See
+  [evaluation results](evaluation.md).
 
 ## Deliberate limitations
 

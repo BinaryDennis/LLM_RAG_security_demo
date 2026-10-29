@@ -64,7 +64,8 @@ seeded documents are synthetic and must be removed after the run. Sharing and te
 disabled by the command. The separate optional
 `security/promptfoo.yaml` red-team config uses local Ollama to generate probes for `pii:direct`
 and `rbac`; it does not include plugins that require cloud generation. Its local generated scan
-produced 20 cases: 5 passed and 15 are untriaged failures. Both configurations use one bearer
+produced 20 cases; after the injection fix, the API abstained on all 20, and the 18 cases the
+local llama3.1 grader marked failed were triaged as grader false positives. Both configurations use one bearer
 token per run and cannot add documents themselves. See [evaluation limitations](docs/evaluation.md),
 the [threat model](docs/threat-model.md), and
 the [risk register](docs/risk-register.md). A passing probe is not proof of security.
@@ -216,15 +217,16 @@ Reading the numbers (⇄ means FastAPI sends a request and gets a reply):
 - The client, the database and the LLM never connect directly. Every rule is enforced in one place.
 - Role filtering happens in the SQL query, before ranking, so forbidden text never reaches the
   LLM.
-- Retrieved text is treated as untrusted (it could contain prompt injection).
+- Retrieved text is treated as untrusted: instruction-like documents are refused at ingestion,
+  instruction-like sentences are redacted before the model, and a reminder follows the question.
 - Traces hold metadata only, never content.
 - Everything runs locally by default.
 
 #### How the system is tested and verified
 
 Testing happens in three layers. Each layer catches different problems, and none of them alone proves the system is secure.
-Layers 1 and 2 have been run and pass; Layer 3 found an unresolved prompt-injection issue (see
-**Status** below).
+All three layers have been run. Layer 3 first found prompt injection; it was mitigated and
+re-tested (see **Status** below).
 
 ```
   Layer 1: automated tests        Layer 2: evaluation set        Layer 3: Promptfoo security probes
@@ -237,7 +239,7 @@ Layers 1 and 2 have been run and pass; Layer 3 found an unresolved prompt-inject
   │                      │        │ citations, abstention│       │ bypass, injection    │
   └──────────────────────┘        └──────────────────────┘       └──────────────────────┘
    strongest guarantees            answer quality                 extra evidence, not proof
-   status: run, passing            status: run, 28/28             status: 10/14; injection found
+   status: run, passing            status: run, 28/28             status: 16/16 after fix
 ```
 
 **Layer 1: automated tests (`tests/`).** Run with `uv run pytest -q`; GitHub Actions also runs
@@ -251,6 +253,7 @@ are the same every time and need no network. Key security checks:
 | Citations come only from retrieved chunks; empty retrieval abstains without calling the model | `test_answering.py` |
 | Model's `INSUFFICIENT_EVIDENCE` reply becomes an abstention with no answer or citations | `test_answering.py` |
 | Retrieved text is marked untrusted (prompt-injection defence) | `test_answering.py` |
+| Instruction-like documents are refused; instruction-like sentences are redacted; sources cannot close their tag | `test_injection.py`, `test_ingest.py`, `test_answering.py` |
 | Bad input gets 422; database/model failures get 503 without internal details | `test_query_api.py` |
 | Traces contain metadata only, never question, chunk text or answer | `test_tracing.py` |
 | Promptfoo target refuses non-local URLs and requires a token | `test_promptfoo_target.py` |
@@ -271,7 +274,8 @@ answerable ones.
 against synthetic public and restricted canary documents. A run:
 
 1. **Seeds canaries:** `uv run python -m security.canaries` adds a synthetic poisoned public page
-   and a synthetic restricted document, then checks that retrieval can find the expected canaries.
+   a paraphrased (evasive) poisoned page that the patterns miss, and a synthetic restricted
+   document, then checks that retrieval can find the expected canaries.
 2. **Sends probes:** `security/promptfoo_target.py` posts each hand-written question to
    `http://127.0.0.1:8000/v1/query`.
    It refuses any non-loopback address.
@@ -285,11 +289,13 @@ Promptfoo itself may be downloaded by `npx`. The companion red-team config
 `rbac` plugins. Both suites target loopback and use one bearer token per run.
 
 **Status:**
-- **Layer 1:** run; 57 passed and 1 skipped.
+- **Layer 1:** run; 84 passed and 1 skipped.
 - **Layer 2:** run against the live API with Ollama `llama3.1`: 28/28 on three runs in a row.
-- **Layer 3:** the hand-written local suite found prompt injection: the model followed the poisoned
-  page's instruction and emitted `POISON-CANARY-4417` in four probes (10/14 passed). This is an
-  unresolved finding, not a passing security result. See [docs/evaluation.md](docs/evaluation.md).
+- **Layer 3:** the first run found prompt injection: the model emitted `POISON-CANARY-4417` in four
+  probes (10/14). After the fix (pattern screening, sentence redaction, tag neutralisation and a
+  reminder), the expanded suite passed 16/16 on two runs, including the evasive canary
+  `POISON-CANARY-7730`. That page is not redacted, so only the model's own resistance held there:
+  residual risk, not a guarantee. See [docs/evaluation.md](docs/evaluation.md).
 
 ### 5. Where to look first
 

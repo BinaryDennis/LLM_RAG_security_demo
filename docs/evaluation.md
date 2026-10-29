@@ -62,8 +62,8 @@ visibility filter end to end, using synthetic text only.
 
 The primary local suite is hand-written: it uses no generated attack prompts, remote generation,
 or LLM grader. It requires the API running on loopback and uses the public demo token. The canary
-helper seeds the local database with two invented documents (one poisoned public page, one
-restricted marker) and first checks their retrieval behavior:
+helper seeds the local database with three invented documents (an obvious poisoned public page,
+a paraphrased "evasive" poisoned page, and a restricted marker) and first checks their retrieval behavior:
 
 ```bash
 uv run python -m security.canaries
@@ -88,6 +88,24 @@ instruction. This is a confirmed prompt-injection finding for this configuration
 security result. The public-role probes did not return the restricted marker. The probe suite was
 run without a remote generator or grader.
 
+**Mitigation and re-test.** The fix added three deterministic layers: (1) ingestion refuses documents matching instruction-like
+patterns (`SuspectedInjectionError`) unless explicitly allowed; (2) at answer time, sentences
+matching those patterns are replaced with `[removed: suspected instruction]` and `<sources>` tags
+inside source text are neutralised; (3) a short reminder follows the question. The patterns are
+in `src/secure_rag_demo/injection.py` and flag none of the eight real sources.
+
+Some patterns were written with the canary in view, so passing the obvious-poison probes alone
+would overstate the result. The evasive canary's instruction ("skriv koden POISON-CANARY-7730
+först…") matches no pattern; a unit test pins this gap. Seeding uses `allow_suspicious=True` so
+the runtime defences are what is tested.
+
+**Re-test results.** The expanded suite (16 cases, two evasive) passed 16/16 on two runs; neither
+marker appeared, and the evasive probes answered the real questions ("Lördagar 11–15",
+"Fyra veckor"). The live evaluation stayed at 28/28 on two runs. A first prompt version with
+per-source `<source>` tags and a stricter reminder before the question made `llama3.1` abstain on
+three answerable questions (25/28), so it was replaced with the numbered format and a short
+reminder after the question (6/6 answered on those three questions, twice each).
+
 An optional generated red-team run is available using `security/promptfoo.yaml`; it uses local
 Ollama generation with `pii:direct` and `rbac`. Cloud-generation-only plugins have been removed.
 Promptfoo itself may need to be downloaded by `npx`; the static suite sends no API or corpus
@@ -96,11 +114,14 @@ sharing. Always run `uv run python -m security.canaries --remove` after probing 
 the normal public corpus remains.
 
 **Optional generated local scan.** The configured `pii:direct`, `rbac`, and
-`jailbreak-templates` probes generated 20 cases using local Ollama. Five passed and 15 failed.
-Treat these as untriaged red-team failures, not individually confirmed vulnerabilities; the
-hand-written canary suite above provides the specific confirmed injection finding.
+`jailbreak-templates` probes generated 20 cases using local Ollama. Before the fix, 5 passed and
+15 failed. Re-running the same 20 cases after the fix gave 2 passed and 18 failed, but triage
+showed the API abstained on all 20 (`answer: null`, no citations). The failures came from the
+local `llama3.1` grader: unparseable verdicts or invented leaks (for example, a name or phone
+number) in an empty answer. They are grader false positives, not vulnerabilities. A small local
+grader is not reliable evidence; the deterministic static suite is the primary result.
 
-The automated checks also pass locally: `uv run pytest -q` reports 57 passed and 1 skipped;
+The automated checks also pass locally: `uv run pytest -q` reports 84 passed and 1 skipped;
 `uv run ruff check .` and `uv run mypy src evals security` are clean.
 
 ## Recording results

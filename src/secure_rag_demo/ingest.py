@@ -6,11 +6,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from secure_rag_demo.embeddings import EmbeddingService
+from secure_rag_demo.injection import find_injection
 from secure_rag_demo.models import Document, DocumentChunk
 from secure_rag_demo.schemas import DocumentInput
 
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 150
+
+
+class SuspectedInjectionError(ValueError):
+    """Raised when a document contains instruction-like text and was not explicitly allowed."""
 
 
 PROVENANCE_PREFIX = "Source: "
@@ -46,10 +51,19 @@ def chunk_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) 
     return chunks
 
 
-def ingest_document(session: Session, document: DocumentInput, embedder: EmbeddingService) -> int:
+def ingest_document(
+    session: Session,
+    document: DocumentInput,
+    embedder: EmbeddingService,
+    *,
+    allow_suspicious: bool = False,
+) -> int:
     text = normalize_text(document.text)
     if not text:
         raise ValueError("document text is empty")
+    suspicious = find_injection(text)
+    if suspicious and not allow_suspicious:
+        raise SuspectedInjectionError(f"suspected prompt injection: {suspicious[:3]}")
     digest = content_hash(text)
     if session.scalar(select(Document.id).where(Document.content_hash == digest)) is not None:
         return 0

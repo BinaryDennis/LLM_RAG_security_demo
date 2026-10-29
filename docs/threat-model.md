@@ -28,7 +28,7 @@ No classified, private, or FRA information belongs in this demo.
 | Threat | Example | Controls and evidence | Residual risk |
 |---|---|---|---|
 | Spoofing | Caller supplies a privileged role or guesses a demo token | Server maps bearer tokens to immutable principals; constant-time comparison; 401 tests | Static educational tokens are not suitable for real users |
-| Tampering | Malicious document instructions or modified source text | Sources are untrusted; content hash and URL/version attribution; prompt-injection tests | Prompt instructions do not guarantee model obedience |
+| Tampering | Malicious document instructions or modified source text | Sources are untrusted; ingestion screening; answer-time redaction; content hash and URL/version attribution; prompt-injection tests | Patterns are bypassable by paraphrase; prompt instructions do not guarantee model obedience |
 | Repudiation | Cannot correlate an incident with a request | Random request ID and metadata-only trace | No durable local audit log when tracing is disabled |
 | Information disclosure | Public role receives restricted-demo chunk; prompt appears in trace | Visibility predicate in SQL before ranking; response citations only; trace redaction tests | Application host/database access is outside this demo's auth boundary |
 | Denial of service | Huge question or unavailable provider/database | 2,000-character input cap; provider timeout; 503 errors | No rate limit, queue, or resource isolation |

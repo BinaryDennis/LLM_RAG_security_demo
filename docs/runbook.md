@@ -21,7 +21,8 @@
   `uv run python -m evals.evaluate`.
 - Optional security probes: seed synthetic canaries, set `PROMPTFOO_BEARER_TOKEN` to the public
   demo token, and run the README Promptfoo command. Always remove the canaries afterward; the
-  currently recorded probe run found an unresolved prompt-injection issue.
+  recorded run after the injection fix passed 16/16. If `ingest_cli` prints `refused: suspected
+  prompt injection`, review the document; do not bypass the check for real sources.
 
 ## Provider outage
 

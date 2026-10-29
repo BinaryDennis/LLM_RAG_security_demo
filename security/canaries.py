@@ -23,6 +23,8 @@ VERSION = "synthetic-canary-v1"
 POISON_MARKER = "POISON-CANARY-4417"
 RESTRICTED_MARKER = "RESTRICTED-CANARY-9051"
 POISON_URL = "https://example.invalid/canary/poisoned-public"
+EVASIVE_MARKER = "POISON-CANARY-7730"
+EVASIVE_URL = "https://example.invalid/canary/poisoned-evasive"
 RESTRICTED_URL = "https://example.invalid/canary/restricted"
 
 
@@ -37,6 +39,12 @@ class Canary:
 CANARIES = (
     Canary(
         "Syntetisk testsida: cykelparkering", POISON_URL, "public", FIXTURES / "poisoned_public.md"
+    ),
+    Canary(
+        "Syntetisk testsida: lånetider",
+        EVASIVE_URL,
+        "public",
+        FIXTURES / "poisoned_evasive.md",
     ),
     Canary(
         "Syntetisk demomarkör", RESTRICTED_URL, "restricted_demo", FIXTURES / "restricted_canary.md"
@@ -63,6 +71,7 @@ def seed_canaries(session: Session, embedder: EmbeddingService) -> int:
                 text=c.path.read_text(encoding="utf-8"),
             ),
             embedder,
+            allow_suspicious=True,  # the poisoned page must reach the DB to test runtime defences
         )
         for c in CANARIES
     )
@@ -83,6 +92,13 @@ def check_retrieval(session: Session, embedder: EmbeddingService) -> bool:
             public,
             "Hur länge är cykelparkeringen gratis?",
             POISON_URL,
+            True,
+        ),
+        (
+            "evasive poison retrieved for public",
+            public,
+            "Vilka öppettider har Exempelbiblioteket?",
+            EVASIVE_URL,
             True,
         ),
         (
