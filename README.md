@@ -362,10 +362,72 @@ Promptfoo itself may be downloaded by `npx`. The companion red-team config
   `/v1/agent-query`: 32/32 passed (16 per endpoint, same answers and abstentions).
   See [docs/evaluation.md](docs/evaluation.md).
 
-### 5. Where to look first
+### 5. Project map: what each file is responsible for
+
+**Application code (`src/secure_rag_demo/`)**
+
+| File | Responsibility |
+|---|---|
+| `main.py` | Entry point for `uvicorn`: builds the FastAPI app. |
+| `api.py` | HTTP routes (`/healthz`, `/v1/query`, `/v1/agent-query`). The hub: wires auth, retrieval, model and tracing, and turns failures into generic 503s. |
+| `auth.py` | Maps a bearer token to a server-side `Principal` (role). The caller can never pick their own role. |
+| `config.py` | Reads settings from `.env` (database URL, model, tokens, tracing). One place for configuration. |
+| `schemas.py` | Request and response shapes. Rejects blank or over-long questions before any work starts. |
+| `ingest.py` | Cleans, chunks, hashes and embeds one document and stores it. Refuses documents that look like prompt injection. |
+| `ingest_cli.py` | Command-line wrapper around `ingest.py` (`--title`, `--url`, `--version`, `--visibility`). |
+| `embeddings.py` | Turns text into 384-number vectors locally (FastEmbed, multilingual E5). |
+| `models.py` | Database tables as Python classes: `Document` and `DocumentChunk` (with vector). |
+| `db.py` | Creates the database engine and sessions. |
+| `retrieval.py` | `search_chunks`: vector search with the role filter inside the SQL, before ranking. |
+| `answering.py` | Builds the prompt from allowed chunks, calls the model, returns answer + citations or abstains. |
+| `injection.py` | Patterns that spot instruction-like text; used to refuse at ingestion and redact at answer time. |
+| `providers.py` | The only code that talks to the LLM (OpenAI-compatible API, local Ollama by default). |
+| `agent.py` | Optional read-only agent: one allowed search tool, validates the model's tool call, 30 s deadline. |
+| `tracing.py` | Optional LangSmith tracing with metadata only (never question, sources or answer). |
+
+**Database, setup and CI**
+
+| File | Responsibility |
+|---|---|
+| `compose.yaml` | Starts PostgreSQL with pgvector on `127.0.0.1` only. |
+| `alembic/` | Database migrations: creates the tables, vector column and indexes. |
+| `pyproject.toml`, `uv.lock` | Dependencies and tool settings (ruff, mypy, pytest), locked versions. |
+| `.env.example` | Template for local settings. Copy to `.env`; never commit real secrets. |
+| `.github/workflows/ci.yml` | On every push: migrate, lint, type-check and run the tests. |
+
+**Evaluation and security testing**
+
+| File | Responsibility |
+|---|---|
+| `evals/public_questions.jsonl` | 28 Swedish questions: 23 the sources answer, 5 they must refuse. |
+| `evals/sources.json` | Maps short source IDs to the exact URLs that answers must cite. |
+| `evals/evaluate.py` | Sends the questions to the running API (`--endpoint query` or `agent`) and checks citations and abstention. |
+| `security/canaries.py` | Seeds (or `--remove`s) fake poisoned and restricted documents so leaks are easy to detect. |
+| `security/fixtures/` | The canary documents themselves: synthetic text with unique marker strings. |
+| `security/promptfoo-static.yaml` | 16 hand-written attack probes, run against both endpoints. |
+| `security/promptfoo.yaml` | Optional generated red-team scan (local plugins only). |
+| `security/promptfoo_target.py` | Bridge from Promptfoo to the API; only allows loopback HTTP. |
+
+**Tests (`tests/`)**: mostly one `test_<module>.py` per module above (for example `test_retrieval.py`
+checks the role filter). `conftest.py` gives each test a real Postgres session that is rolled back
+afterwards, plus a fake embedder.
+
+**Docs (`docs/`)**
+
+| File | Responsibility |
+|---|---|
+| `architecture.md` | Components, data flows, trust boundaries and how the system is verified. |
+| `threat-model.md` | What can go wrong (STRIDE), the controls, and what risk remains. |
+| `risk-register.md` | Ranked risks with evidence and residual level. |
+| `evaluation.md` | Recorded evaluation and Promptfoo results, including failures and fixes. |
+| `runbook.md` | How to start, check and troubleshoot the system locally. |
+| `demo-script.md` | A five-minute interview walkthrough, in Swedish and English. |
+
+**Where to start reading**
 
 1. `src/secure_rag_demo/ingest.py`: the clearest example of the pipeline.
 2. `src/secure_rag_demo/models.py`: how tables map to classes.
 3. `tests/test_ingest.py`: shows what "correct" means.
+4. `src/secure_rag_demo/api.py`: follow one request from start to finish.
 
 Run one test to watch it work: `uv run pytest tests/test_ingest.py -v`
