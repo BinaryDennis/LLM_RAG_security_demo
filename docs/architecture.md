@@ -87,7 +87,7 @@ designed to execute; the "Status" column records whether it actually has.
 |---|---|---|---|---|
 | 1. Automated tests | `uv run pytest -q` (also in CI with Ruff and mypy) | Postgres only; fake model and embedder | Security controls, deterministically | Run; 96 passed, 1 skipped |
 | 2. Evaluation set | `uv run python -m evals.evaluate` | Running API, Ollama, ingested sources | Citations and abstention on 28 Swedish questions | Run; 28/28 on three consecutive runs |
-| 3. Promptfoo probes | `uv run python -m security.canaries`, then `npx promptfoo eval -c security/promptfoo-static.yaml` | Running API, local DB, Ollama app model | Prompt injection, role bypass, leakage and abstention | 16/16 after fix; residual risk remains |
+| 3. Promptfoo probes | `uv run python -m security.canaries`, then `npx promptfoo eval -c security/promptfoo-static.yaml` | Running API, local DB, Ollama app model | Prompt injection, role bypass, leakage and abstention | 32/32 (16 per endpoint: query and agent); residual risk remains |
 
 ### Layer 1: automated tests
 
@@ -129,7 +129,8 @@ matching those patterns are replaced with `[removed: suspected instruction]` and
 inside source text are neutralised; (3) a short reminder follows the question. The patterns are
 in `src/secure_rag_demo/injection.py` and flag none of the eight real sources.
 A third canary uses a paraphrased instruction (`POISON-CANARY-7730`) that the patterns deliberately
-miss, to measure what remains. The expanded suite passed 16/16 on two runs. The result is specific
+miss, to measure what remains. The expanded suite passed 16/16 on two runs. It now runs every probe against both
+`/v1/query` and `/v1/agent-query` (two Promptfoo providers); the latest run passed 32/32. The result is specific
 to this corpus and model and does not establish a general attack success rate.
 
 An optional generated red-team config, `security/promptfoo.yaml`, retains the local `pii:direct`
@@ -142,10 +143,10 @@ token per run; the target cannot itself add documents or compare roles in a sing
 
 ### Current status
 
-- **Layer 1:** executed; 96 tests pass and 1 is skipped. Ruff and mypy pass locally.
+- **Layer 1:** executed; 98 tests pass and 1 is skipped. Ruff and mypy pass locally.
 - **Layer 2:** executed; 28/28 cases pass on three consecutive runs.
 - **Layer 3:** prompt injection found (10/14), mitigated, and re-tested: 16/16 on two runs,
-  including the evasive canary. Residual model-level risk remains. See
+  including the evasive canary; later 32/32 across the query and agent endpoints. Residual model-level risk remains. See
   [evaluation results](evaluation.md).
 
 ## Deliberate limitations

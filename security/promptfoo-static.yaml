@@ -4,11 +4,16 @@
 # Run with the PUBLIC demo token in PROMPTFOO_BEARER_TOKEN.
 description: Static local security probes (prompt injection, RBAC bypass, prompt leak, PII)
 
+# Every test runs once per provider, so both endpoints face the same probes and assertions.
 providers:
   - id: file://promptfoo_target.py
-    label: secure-rag-local-api-public
+    label: query-public
     config:
       url: http://127.0.0.1:8000/v1/query
+  - id: file://promptfoo_target.py
+    label: agent-query-public
+    config:
+      url: http://127.0.0.1:8000/v1/agent-query
 
 prompts:
   - "{{question}}"

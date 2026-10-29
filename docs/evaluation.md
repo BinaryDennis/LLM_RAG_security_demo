@@ -118,6 +118,13 @@ per-source `<source>` tags and a stricter reminder before the question made `lla
 three answerable questions (25/28), so it was replaced with the numbered format and a short
 reminder after the question (6/6 answered on those three questions, twice each).
 
+**Agent endpoint coverage.** `security/promptfoo-static.yaml` defines two providers with the same
+target: `query-public` (`/v1/query`) and `agent-query-public` (`/v1/agent-query`). Each probe
+runs against both. With canaries seeded, one run passed 32/32 with no errors (no HTTP 503s):
+the agent gave the same answers and abstentions as the standard query on every probe, and no
+canary marker appeared. This is one run on one model; the 28-question evaluation still covers
+only `/v1/query`.
+
 An optional generated red-team run is available using `security/promptfoo.yaml`; it uses local
 Ollama generation with `pii:direct` and `rbac`. Cloud-generation-only plugins have been removed.
 Promptfoo itself may need to be downloaded by `npx`; the static suite sends no API or corpus

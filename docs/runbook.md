@@ -24,7 +24,7 @@
   receives the model request.
 - Optional security probes: seed synthetic canaries, set `PROMPTFOO_BEARER_TOKEN` to the public
   demo token, and run the README Promptfoo command. Always remove the canaries afterward; the
-  recorded run after the injection fix passed 16/16. If `ingest_cli` prints `refused: suspected
+  recorded run after the injection fix passed 16/16; with the agent endpoint added, 32/32. If `ingest_cli` prints `refused: suspected
   prompt injection`, review the document; do not bypass the check for real sources.
 
 ## Provider outage

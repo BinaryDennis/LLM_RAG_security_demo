@@ -8,9 +8,10 @@ from urllib.request import Request, urlopen
 
 def call_api(prompt: str, options: dict[str, Any], context: dict[str, Any]) -> dict[str, str]:
     config = options.get("config", {})
-    url = os.environ.get(
-        "SECURE_RAG_TARGET_URL",
-        config.get("url", "http://127.0.0.1:8000/v1/query"),
+    # Per-provider config wins, so one run can target several endpoints without the env var
+    # silently redirecting them all to the same URL.
+    url = config.get("url") or os.environ.get(
+        "SECURE_RAG_TARGET_URL", "http://127.0.0.1:8000/v1/query"
     )
     parsed = urlparse(url)
     if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:

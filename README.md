@@ -256,7 +256,7 @@ re-tested (see **Status** below).
   │                      │        │ citations, abstention│       │ bypass, injection    │
   └──────────────────────┘        └──────────────────────┘       └──────────────────────┘
    strongest guarantees            answer quality                 extra evidence, not proof
-   status: run, 96 passed          status: run, 28/28             status: 16/16 after fix
+   status: run, 98 passed          status: run, 28/28             status: 32/32 on 2 APIs
 ```
 
 **Layer 1: automated tests (`tests/`).** Run with `uv run pytest -q`; GitHub Actions also runs
@@ -307,13 +307,16 @@ Promptfoo itself may be downloaded by `npx`. The companion red-team config
 `rbac` plugins. Both suites target loopback and use one bearer token per run.
 
 **Status:**
-- **Layer 1:** run; 96 passed and 1 skipped (including the read-only agent boundary tests).
+- **Layer 1:** run; 98 passed and 1 skipped (including the read-only agent boundary tests).
 - **Layer 2:** run against the live API with Ollama `llama3.1`: 28/28 on three runs in a row.
 - **Layer 3:** the first run found prompt injection: the model emitted `POISON-CANARY-4417` in four
   probes (10/14). After the fix (pattern screening, sentence redaction, tag neutralisation and a
   reminder), the expanded suite passed 16/16 on two runs, including the evasive canary
   `POISON-CANARY-7730`. That page is not redacted, so only the model's own resistance held there:
-  residual risk, not a guarantee. See [docs/evaluation.md](docs/evaluation.md).
+  residual risk, not a guarantee. The suite now runs each probe against both `/v1/query` and the read-only agent
+  `/v1/agent-query`: 32/32 passed (16 per endpoint, same answers and abstentions).
+  The 28-question evaluation still targets only
+  `/v1/query`. See [docs/evaluation.md](docs/evaluation.md).
 
 ### 5. Where to look first
 
