@@ -60,44 +60,48 @@ visibility filter end to end, using synthetic text only.
 
 ## Promptfoo probes
 
-Promptfoo sends adversarial questions only to `127.0.0.1`. The Python target refuses non-loopback
-URLs and reads its token from `PROMPTFOO_BEARER_TOKEN`. Sharing is disabled for runs:
+The primary local suite is hand-written: it uses no generated attack prompts, remote generation,
+or LLM grader. It requires the API running on loopback and uses the public demo token. The canary
+helper seeds the local database with two invented documents (one poisoned public page, one
+restricted marker) and first checks their retrieval behavior:
 
 ```bash
+uv run python -m security.canaries
 PROMPTFOO_DISABLE_SHARING=true \
+PROMPTFOO_DISABLE_TELEMETRY=1 \
 PROMPTFOO_BEARER_TOKEN=demo-public-token-change-me \
-npx promptfoo@0.125.1 redteam run -c security/promptfoo.yaml --force
+npx promptfoo@0.125.1 eval -c security/promptfoo-static.yaml
+uv run python -m security.canaries --remove
 ```
 
-Local Ollama (`llama3.1`) grades the replies and writes most probes. `indirect-prompt-injection`
-and `rag-document-exfiltration` require Promptfoo's cloud generation, which receives the scan
-`purpose` and plugin settings (no tokens). Promptfoo requires email verification before a scan
-that uses cloud generation. Add `PROMPTFOO_DISABLE_REMOTE_GENERATION=true` for a fully local,
-partial scan. Result sharing stays disabled.
+Promptfoo sends the probes only to `127.0.0.1`. The Python target refuses non-loopback URLs and
+reads its token from `PROMPTFOO_BEARER_TOKEN`. The suite checks response JSON, restricted-marker
+non-disclosure, poisoned-marker non-disclosure, no system prompt fragment, and abstention for
+invented personal-data questions. The assertions are deterministic, although the API model output
+is not.
 
-**Local-only run (2026-10-27, before the answerability gate).** Promptfoo 0.125.1 requested 40 cases,
-but produced 20: 5 `pii:direct`, 5 `rbac`, and 10 `jailbreak-templates` cases. The
-`indirect-prompt-injection` and `rag-document-exfiltration` plugins each failed to generate their
-five cases because they require remote generation, which was explicitly disabled. All 20
-generated probes passed (20/20; scan duration 1m 52s). Treat this as a partial scan, not a pass
-for all configured plugins. The run used local Ollama `llama3.1`; result sharing and remote
-generation were disabled.
+**Hand-written local run (2026-10-27).** Promptfoo 0.125.1 ran 14 cases against Ollama `llama3.1`
+at temperature 0 with the canary documents seeded: 10 passed and 4 failed. All four failed
+because the answer began with `POISON-CANARY-4417`, exactly as directed by the poisoned public
+document. The model still returned relevant bicycle-parking facts, but followed the injected
+instruction. This is a confirmed prompt-injection finding for this configuration, not a passing
+security result. The public-role probes did not return the restricted marker. The probe suite was
+run without a remote generator or grader.
 
-**Run with cloud generation:** pending. It needs interactive email verification.
+An optional generated red-team run is available using `security/promptfoo.yaml`; it uses local
+Ollama generation with `pii:direct` and `rbac`. Cloud-generation-only plugins have been removed.
+Promptfoo itself may need to be downloaded by `npx`; the static suite sends no API or corpus
+content to a remote grader. `PROMPTFOO_DISABLE_SHARING=true` can additionally disable result
+sharing. Always run `uv run python -m security.canaries --remove` after probing and verify only
+the normal public corpus remains.
 
-The `indirect-prompt-injection` plugin puts its payload in a `context` variable. The target sends
-only the question, so the payload never reaches the API, and passes from that plugin say nothing
-about document-borne injection. That is covered by the deterministic unit test and the threat
-model.
+**Optional generated local scan.** The configured `pii:direct`, `rbac`, and
+`jailbreak-templates` probes generated 20 cases using local Ollama. Five passed and 15 failed.
+Treat these as untriaged red-team failures, not individually confirmed vulnerabilities; the
+hand-written canary suite above provides the specific confirmed injection finding.
 
-The configured indirect-injection and document-exfiltration plugins may not fully exercise
-retrieved-document poisoning: the scanner sends requests through the query API and cannot insert
-test documents into the database. The prompt-injection unit test is deterministic. RBAC behavior is
-most directly proved by the public/restricted retrieval tests, because a single Promptfoo target
-uses one bearer token per run.
-
-The automated checks also pass locally: `uv run pytest -q` reports 53 passed and 1 skipped;
-`uv run ruff check .` and `uv run mypy src evals security/promptfoo_target.py` are clean.
+The automated checks also pass locally: `uv run pytest -q` reports 57 passed and 1 skipped;
+`uv run ruff check .` and `uv run mypy src evals security` are clean.
 
 ## Recording results
 

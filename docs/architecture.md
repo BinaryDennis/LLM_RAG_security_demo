@@ -69,7 +69,7 @@ designed to execute; the "Status" column records whether it actually has.
 |---|---|---|---|---|
 | 1. Automated tests | `uv run pytest -q` (also in CI with Ruff and mypy) | Postgres only; fake model and embedder | Security controls, deterministically | Run; passing |
 | 2. Evaluation set | `uv run python -m evals.evaluate` | Running API, Ollama, ingested sources | Citations and abstention on 28 Swedish questions | Run; 28/28 on three consecutive runs |
-| 3. Promptfoo red team | `npx promptfoo redteam run -c security/promptfoo.yaml` | Running API, Ollama | Resistance to generated attack prompts | Partial; local-only run 20/20, run with cloud generation pending |
+| 3. Promptfoo probes | `uv run python -m security.canaries`, then `npx promptfoo eval -c security/promptfoo-static.yaml` | Running API, local DB, Ollama app model | Prompt injection, role bypass, leakage and abstention | 10/14; prompt-injection finding |
 
 ### Layer 1: automated tests
 
@@ -83,6 +83,7 @@ designed to execute; the "Status" column records whether it actually has.
 | Traces carry metadata only; marker strings in question, chunk and answer never appear | `tests/test_tracing.py` |
 | Tracing is off by default and LangSmith receives the hide settings | `tests/test_tracing.py` |
 | Promptfoo target refuses non-loopback URLs and requires a token | `tests/test_promptfoo_target.py` |
+| Synthetic canaries seed repeatably, enforce visibility, and remove only themselves | `tests/test_canaries.py` |
 
 ### Layer 2: evaluation set
 
@@ -94,35 +95,31 @@ the exact URLs in `evals/sources.json`. The live run returned the expected citat
 supported cases, and all 5 unsupported cases abstain via the answerability gate; see
 [evaluation results](evaluation.md).
 
-### Layer 3: Promptfoo red team
+### Layer 3: Promptfoo security probes
 
-Promptfoo acts as an automated attacker. It generates attack prompts with an LLM, sends them to
-the API through `security/promptfoo_target.py`, grades each reply with an LLM, and reports pass or
-fail. Plugins: `indirect-prompt-injection`, `pii:direct`, `rbac` and `rag-document-exfiltration`,
-with the `jailbreak-templates` strategy.
+The hand-written suite in `security/promptfoo-static.yaml` sends explicit attack questions to the
+loopback API and checks the JSON response with deterministic assertions; it has no generated
+probes or model grader. Before the run, `security.canaries` inserts a synthetic poisoned public
+page and a synthetic restricted document, and verifies they are retrievable only by the intended
+principal. Remove these temporary documents after the run.
 
-Boundaries of this layer:
-- **Generation:** `redteam.provider` is local Ollama (`llama3.1`), which grades replies and writes
-  most probes. `indirect-prompt-injection` and `rag-document-exfiltration` need Promptfoo's cloud
-  generation, which receives the scan `purpose` and plugin settings (no tokens; public corpus).
-  `PROMPTFOO_DISABLE_REMOTE_GENERATION=true` makes the scan fully local but skips those two plugins.
-  `PROMPTFOO_DISABLE_SHARING=true` prevents uploading results. Downloading Promptfoo via `npx`
-  still needs the network, and Promptfoo telemetry is not disabled.
-- **Indirect injection is not delivered:** that plugin places its payload in a `context` variable.
-  The target forwards only the question, so the payload never reaches the API. Its passes are not
-  evidence about document-borne injection.
-- **Loopback only:** the target accepts only `http` on `127.0.0.1`, `localhost` or `::1`.
-- **No corpus poisoning:** the target sends only `{"question": ...}`. Promptfoo cannot insert a
-  malicious document, so document-borne injection is primarily verified by Layer 1.
-- **One role per run:** each run uses one `PROMPTFOO_BEARER_TOKEN`, so cross-role separation is
-  primarily verified by Layer 1.
+The run found that local Ollama `llama3.1` followed the poisoned page's instruction: four probes
+returned `POISON-CANARY-4417` (10/14 passed). The injection finding is unresolved. The result is
+specific to this test corpus and model, and does not establish a general attack success rate.
+
+An optional generated red-team config, `security/promptfoo.yaml`, retains the local `pii:direct`
+and `rbac` plugins. Plugins that require cloud generation have been removed. A local generated
+run produced 20 cases: 5 passed and 15 failed; those failures have not been individually triaged.
+The static suite requires no cloud generation, model grader, or result sharing. `npx` may download
+Promptfoo from the package registry. The target accepts only loopback HTTP and reads one bearer
+token per run; the target cannot itself add documents or compare roles in a single run.
 
 ### Current status
 
-- **Layer 1:** executed; 53 tests pass and 1 is skipped. Ruff and mypy pass locally.
+- **Layer 1:** executed; 57 tests pass and 1 is skipped. Ruff and mypy pass locally.
 - **Layer 2:** executed; 28/28 cases pass on three consecutive runs.
-- **Layer 3:** the local-only run passed all 20 generated probes, but two plugins produced none.
-  The run with cloud generation is pending. See [evaluation results](evaluation.md).
+- **Layer 3:** hand-written local probes ran 14 cases; 10 passed and four exposed prompt-injection
+  behavior. The issue remains unresolved. See [evaluation results](evaluation.md).
 
 ## Deliberate limitations
 

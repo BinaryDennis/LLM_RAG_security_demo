@@ -14,12 +14,14 @@
 ## Verify
 
 - `uv run ruff check .`
-- `uv run mypy src evals security/promptfoo_target.py`
+- `uv run mypy src evals security`
 - `uv run pytest -q`
 - Optional real embedding download: `RUN_MODEL_SMOKE=1 uv run pytest tests/test_embeddings_smoke.py -q`
 - Optional local API evaluation: set `EVAL_BEARER_TOKEN` to a demo token and run
   `uv run python -m evals.evaluate`.
-- Optional security probes: set `PROMPTFOO_BEARER_TOKEN` and run the README Promptfoo command.
+- Optional security probes: seed synthetic canaries, set `PROMPTFOO_BEARER_TOKEN` to the public
+  demo token, and run the README Promptfoo command. Always remove the canaries afterward; the
+  currently recorded probe run found an unresolved prompt-injection issue.
 
 ## Provider outage
 

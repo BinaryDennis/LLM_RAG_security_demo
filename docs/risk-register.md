@@ -2,7 +2,7 @@
 
 | ID | Risk | Initial severity | Control/evidence | Residual risk | Owner |
 |---|---|---|---|---|---|
-| R1 | Prompt injection in a public source manipulates answer | High | Untrusted-source prompt; no tools; `test_injection_text_is_marked_untrusted_and_system_prompt_warns`; Promptfoo probes | Medium: prompts are not a security boundary | Demo maintainer |
+| R1 | Prompt injection in a public source manipulates answer | High | Untrusted-source prompt; no tools; synthetic canary probe | High until mitigated: local `llama3.1` followed the poisoned page instruction and emitted its marker in 4/14 probes | Demo maintainer |
 | R2 | Unauthorized visibility data reaches generation | High | SQL visibility predicate before ranking; retrieval and API access tests | Low for tested path; database/operator access is not covered | Demo maintainer |
 | R3 | Model states claims not supported by sources | High | Citation-only-from-retrieval contract, abstain on empty retrieval, `INSUFFICIENT_EVIDENCE` answerability gate, evaluation set (28/28) | Medium: gate depends on the LLM following instructions; no independent claim entailment verifier | Demo maintainer |
 | R4 | Question, chunk, or answer is sent to tracing | High | Metadata-only trace payload, hidden input/output settings, seeded-marker test | Low for implemented trace path; external SDK behavior still needs review on upgrades | Demo maintainer |
