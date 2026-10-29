@@ -63,6 +63,7 @@ eight ingested sources, and five unsupported questions. With the sources ingeste
 
 ```bash
 EVAL_BEARER_TOKEN=YOUR_LOCAL_DEMO_TOKEN uv run python -m evals.evaluate
+EVAL_BEARER_TOKEN=YOUR_LOCAL_DEMO_TOKEN uv run python -m evals.evaluate --endpoint agent
 ```
 
 Optional Promptfoo probes run against the loopback API only:
@@ -256,7 +257,7 @@ re-tested (see **Status** below).
   │                      │        │ citations, abstention│       │ bypass, injection    │
   └──────────────────────┘        └──────────────────────┘       └──────────────────────┘
    strongest guarantees            answer quality                 extra evidence, not proof
-   status: run, 98 passed          status: run, 28/28             status: 32/32 on 2 APIs
+   status: run, 101 passed         status: 28/28 on 2 APIs        status: 32/32 on 2 APIs
 ```
 
 **Layer 1: automated tests (`tests/`).** Run with `uv run pytest -q`; GitHub Actions also runs
@@ -281,6 +282,8 @@ are the same every time and need no network. Key security checks:
 public sources can answer (at least two per source) and 5 they cannot. When run against the live API, `evals.evaluate`
 sends each question and checks that supported questions cite the expected source URL and that
 unsupported questions abstain with no answer and no citations. The live run passes 28/28.
+Add `--endpoint agent` to run the same 28 questions against the read-only agent
+(`/v1/agent-query`); it also passed 28/28 on two runs.
 
 Abstaining has two layers. If retrieval finds nothing, the API abstains without calling the model.
 If it finds chunks that do not answer the question, the model is told to reply only
@@ -307,16 +310,16 @@ Promptfoo itself may be downloaded by `npx`. The companion red-team config
 `rbac` plugins. Both suites target loopback and use one bearer token per run.
 
 **Status:**
-- **Layer 1:** run; 98 passed and 1 skipped (including the read-only agent boundary tests).
-- **Layer 2:** run against the live API with Ollama `llama3.1`: 28/28 on three runs in a row.
+- **Layer 1:** run; 101 passed and 1 skipped (including the read-only agent boundary tests).
+- **Layer 2:** run against the live API with Ollama `llama3.1`: 28/28 on three runs in a row
+  for `/v1/query`, and 28/28 on two runs for `/v1/agent-query`.
 - **Layer 3:** the first run found prompt injection: the model emitted `POISON-CANARY-4417` in four
   probes (10/14). After the fix (pattern screening, sentence redaction, tag neutralisation and a
   reminder), the expanded suite passed 16/16 on two runs, including the evasive canary
   `POISON-CANARY-7730`. That page is not redacted, so only the model's own resistance held there:
   residual risk, not a guarantee. The suite now runs each probe against both `/v1/query` and the read-only agent
   `/v1/agent-query`: 32/32 passed (16 per endpoint, same answers and abstentions).
-  The 28-question evaluation still targets only
-  `/v1/query`. See [docs/evaluation.md](docs/evaluation.md).
+  See [docs/evaluation.md](docs/evaluation.md).
 
 ### 5. Where to look first
 

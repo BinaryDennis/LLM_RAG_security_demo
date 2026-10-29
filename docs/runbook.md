@@ -18,7 +18,7 @@
 - `uv run pytest -q`
 - Optional real embedding download: `RUN_MODEL_SMOKE=1 uv run pytest tests/test_embeddings_smoke.py -q`
 - Optional local API evaluation: set `EVAL_BEARER_TOKEN` to a demo token and run
-  `uv run python -m evals.evaluate`.
+  `uv run python -m evals.evaluate` (add `--endpoint agent` for `/v1/agent-query`).
 - Optional read-only agent smoke test: call `POST /v1/agent-query` with a demo bearer token.
   The agent offers only one role-filtered retrieval tool; the configured chat provider still
   receives the model request.

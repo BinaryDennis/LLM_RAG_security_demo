@@ -1,14 +1,22 @@
+import argparse
 import json
 import os
 import sys
 from pathlib import Path
 from typing import Any
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent
-API_URL = os.environ.get("SECURE_RAG_TARGET_URL", "http://127.0.0.1:8000/v1/query")
+ENDPOINTS = {
+    "query": "http://127.0.0.1:8000/v1/query",
+    "agent": "http://127.0.0.1:8000/v1/agent-query",
+}
+
+
+def resolve_target_url(endpoint: str) -> str:
+    return os.environ.get("SECURE_RAG_TARGET_URL") or ENDPOINTS[endpoint]
 
 
 def evaluate_response(
@@ -41,8 +49,12 @@ def evaluate_response(
     return errors
 
 
-def main() -> int:
-    parsed = urlparse(API_URL)
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Run the public evaluation set.")
+    parser.add_argument("--endpoint", choices=sorted(ENDPOINTS), default="query")
+    args = parser.parse_args(argv)
+    api_url = resolve_target_url(args.endpoint)
+    parsed = urlparse(api_url)
     if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
         print("Evaluation target must use plain HTTP on loopback only.", file=sys.stderr)
         return 2
@@ -55,10 +67,11 @@ def main() -> int:
     cases = [
         json.loads(line) for line in (ROOT / "public_questions.jsonl").read_text().splitlines()
     ]
+    print(f"target: {api_url}")
     failures = 0
     for case in cases:
         req = Request(
-            API_URL,
+            api_url,
             data=json.dumps({"question": case["question"]}).encode(),
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             method="POST",
@@ -66,6 +79,10 @@ def main() -> int:
         try:
             with urlopen(req, timeout=90) as result:
                 response = json.loads(result.read())
+        except HTTPError as http_error:
+            print(f"{case['id']}: FAIL (HTTP {http_error.code})")
+            failures += 1
+            continue
         except URLError:
             print(f"{case['id']}: FAIL (local API connection failed)")
             failures += 1

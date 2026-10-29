@@ -86,7 +86,7 @@ designed to execute; the "Status" column records whether it actually has.
 | Layer | What runs | Needs | Verifies | Status |
 |---|---|---|---|---|
 | 1. Automated tests | `uv run pytest -q` (also in CI with Ruff and mypy) | Postgres only; fake model and embedder | Security controls, deterministically | Run; 96 passed, 1 skipped |
-| 2. Evaluation set | `uv run python -m evals.evaluate` | Running API, Ollama, ingested sources | Citations and abstention on 28 Swedish questions | Run; 28/28 on three consecutive runs |
+| 2. Evaluation set | `uv run python -m evals.evaluate` | Running API, Ollama, ingested sources | Citations and abstention on 28 Swedish questions | Run; 28/28 on three consecutive runs (query); 28/28 on two runs (agent, `--endpoint agent`) |
 | 3. Promptfoo probes | `uv run python -m security.canaries`, then `npx promptfoo eval -c security/promptfoo-static.yaml` | Running API, local DB, Ollama app model | Prompt injection, role bypass, leakage and abstention | 32/32 (16 per endpoint: query and agent); residual risk remains |
 
 ### Layer 1: automated tests
@@ -143,8 +143,9 @@ token per run; the target cannot itself add documents or compare roles in a sing
 
 ### Current status
 
-- **Layer 1:** executed; 98 tests pass and 1 is skipped. Ruff and mypy pass locally.
-- **Layer 2:** executed; 28/28 cases pass on three consecutive runs.
+- **Layer 1:** executed; 101 tests pass and 1 is skipped. Ruff and mypy pass locally.
+- **Layer 2:** executed; 28/28 cases pass on three consecutive runs against `/v1/query`, and
+  28/28 on two runs against `/v1/agent-query`.
 - **Layer 3:** prompt injection found (10/14), mitigated, and re-tested: 16/16 on two runs,
   including the evasive canary; later 32/32 across the query and agent endpoints. Residual model-level risk remains. See
   [evaluation results](evaluation.md).

@@ -16,6 +16,8 @@ sources ingested, run:
 
 ```bash
 EVAL_BEARER_TOKEN=demo-public-token-change-me uv run python -m evals.evaluate
+# same questions against the read-only agent
+EVAL_BEARER_TOKEN=demo-public-token-change-me uv run python -m evals.evaluate --endpoint agent
 ```
 
 The evaluator checks expected source citations and requires unsupported cases to abstain without
@@ -46,6 +48,7 @@ not embedded.
 | 1, before the gate | 23/28 | All five unsupported cases answered with citations |
 | 2, gate only | 23/28 | All unsupported cases passed. Five supported cases abstained. |
 | 3–5, gate, header stripping, corrected questions | 28/28 | Same result on three consecutive runs |
+| Agent endpoint (`--endpoint agent`) | 28/28 | Same result on two consecutive runs |
 
 In run 2, three failures (`mcf-01`..`03`) were bad test data. Their answers were not in the saved
 MCF landing page, which is only a link index; before the gate, the model had guessed. Those
@@ -63,7 +66,10 @@ visibility filter end to end, using synthetic text only.
 ### Read-only agent checks
 
 The optional `POST /v1/agent-query` endpoint was smoke-tested against the live local API and
-Ollama. A supported Swedish question returned an answer with citations. The deterministic agent
+Ollama. A supported Swedish question returned an answer with citations. The full 28-question
+evaluation (`--endpoint agent`) passed 28/28 on two runs: every supported question cited the
+expected source, and all five unsupported questions abstained. An HTTP error such as 503 is
+reported as a failure. The deterministic agent
 tests additionally verify that only `search_documents` is offered, the server rejects an
 unallowlisted tool or multiple tool calls, public-role retrieval excludes restricted documents,
 the request deadline is enforced, and the tool path performs no writes or network connections.
@@ -122,8 +128,7 @@ reminder after the question (6/6 answered on those three questions, twice each).
 target: `query-public` (`/v1/query`) and `agent-query-public` (`/v1/agent-query`). Each probe
 runs against both. With canaries seeded, one run passed 32/32 with no errors (no HTTP 503s):
 the agent gave the same answers and abstentions as the standard query on every probe, and no
-canary marker appeared. This is one run on one model; the 28-question evaluation still covers
-only `/v1/query`.
+canary marker appeared. This is one run on one model.
 
 An optional generated red-team run is available using `security/promptfoo.yaml`; it uses local
 Ollama generation with `pii:direct` and `rbac`. Cloud-generation-only plugins have been removed.

@@ -86,3 +86,27 @@ def test_evaluator_rejects_answer_for_unsupported_question() -> None:
         "abstention did not match expected value",
         "unsupported case must have null answer and no citations",
     ]
+
+
+def test_resolve_target_url_defaults_to_query_endpoint(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    from evals.evaluate import resolve_target_url
+
+    monkeypatch.delenv("SECURE_RAG_TARGET_URL", raising=False)
+    assert resolve_target_url("query") == "http://127.0.0.1:8000/v1/query"
+    assert resolve_target_url("agent") == "http://127.0.0.1:8000/v1/agent-query"
+
+
+def test_resolve_target_url_env_override_wins(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    from evals.evaluate import resolve_target_url
+
+    monkeypatch.setenv("SECURE_RAG_TARGET_URL", "http://localhost:9000/x")
+    assert resolve_target_url("agent") == "http://localhost:9000/x"
+
+
+def test_main_rejects_unknown_endpoint() -> None:
+    import pytest
+
+    from evals.evaluate import main
+
+    with pytest.raises(SystemExit):
+        main(["--endpoint", "admin"])
