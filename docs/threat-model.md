@@ -32,7 +32,7 @@ No classified, private, or FRA information belongs in this demo.
 | Repudiation | Cannot correlate an incident with a request | Random request ID and metadata-only trace | No durable local audit log when tracing is disabled |
 | Information disclosure | Public role receives restricted-demo chunk; prompt appears in trace | Visibility predicate in SQL before ranking; response citations only; trace redaction tests | Application host/database access is outside this demo's auth boundary |
 | Denial of service | Huge question or unavailable provider/database | 2,000-character input cap; provider timeout; 503 errors | No rate limit, queue, or resource isolation |
-| Elevation of privilege | Prompt injection tells model to fetch other documents | No model tools/database access; authorization before retrieval; injection tests | Model may still produce misleading answers from allowed context |
+| Elevation of privilege | Prompt injection requests disallowed data or actions | Standard query gives the model no tools; optional agent exposes only one role-filtered retrieval tool, with no write or arbitrary network tools | Agent can still retrieve any document allowed to the caller; model may mislead about retrieved evidence |
 
 ## Abuse cases and expected behavior
 

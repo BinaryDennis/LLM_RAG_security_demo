@@ -15,7 +15,7 @@ class FakeProvider:
         self.reply = reply
         self.calls: list[tuple[str, str]] = []
 
-    def complete(self, system_prompt: str, user_prompt: str) -> str:
+    def complete(self, system_prompt: str, user_prompt: str, timeout: float | None = None) -> str:
         self.calls.append((system_prompt, user_prompt))
         return self.reply
 

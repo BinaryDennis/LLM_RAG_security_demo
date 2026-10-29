@@ -32,10 +32,27 @@ uv run uvicorn secure_rag_demo.main:app --host 127.0.0.1 --port 8000
 The demo bearer token in `.env.example` is public and educational only. Set a local replacement
 before running the API. Never reuse a real credential.
 
+### Optional read-only agent
+
+`POST /v1/agent-query` is a stretch-goal demo endpoint. The model gets exactly one tool:
+`search_documents`. The server validates the tool call, performs at most one role-filtered
+retrieval, then answers from those results. There are no write or arbitrary network tools; the
+model-provider request still goes to the configured endpoint (localhost Ollama by default).
+Agent requests have a 30-second deadline and the retrieval query has a matching PostgreSQL
+statement timeout.
+
+```bash
+TOKEN=YOUR_LOCAL_DEMO_TOKEN
+curl -sS http://127.0.0.1:8000/v1/agent-query \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"question":"Vad rekommenderar MCF för hemberedskap?"}'
+```
+
 ## Security evaluation
 
 The deterministic suite checks authorization, grounded citations, abstention, provider/database
-errors, and trace redaction:
+errors, trace redaction, and the agent's tool allowlist, role isolation, timeout, and no-write
+behavior:
 
 ```bash
 uv run pytest -q
@@ -239,7 +256,7 @@ re-tested (see **Status** below).
   │                      │        │ citations, abstention│       │ bypass, injection    │
   └──────────────────────┘        └──────────────────────┘       └──────────────────────┘
    strongest guarantees            answer quality                 extra evidence, not proof
-   status: run, passing            status: run, 28/28             status: 16/16 after fix
+   status: run, 96 passed          status: run, 28/28             status: 16/16 after fix
 ```
 
 **Layer 1: automated tests (`tests/`).** Run with `uv run pytest -q`; GitHub Actions also runs
@@ -258,6 +275,7 @@ are the same every time and need no network. Key security checks:
 | Traces contain metadata only, never question, chunk text or answer | `test_tracing.py` |
 | Promptfoo target refuses non-local URLs and requires a token | `test_promptfoo_target.py` |
 | Synthetic canaries seed repeatably, enforce visibility, and remove only themselves | `test_canaries.py` |
+| Agent has one retrieval tool, one retrieval call, no write/network tool, timeout and role checks | `test_agent.py` |
 
 **Layer 2: evaluation set (`evals/`).** `public_questions.jsonl` holds 23 questions the eight ingested
 public sources can answer (at least two per source) and 5 they cannot. When run against the live API, `evals.evaluate`
@@ -289,7 +307,7 @@ Promptfoo itself may be downloaded by `npx`. The companion red-team config
 `rbac` plugins. Both suites target loopback and use one bearer token per run.
 
 **Status:**
-- **Layer 1:** run; 84 passed and 1 skipped.
+- **Layer 1:** run; 96 passed and 1 skipped (including the read-only agent boundary tests).
 - **Layer 2:** run against the live API with Ollama `llama3.1`: 28/28 on three runs in a row.
 - **Layer 3:** the first run found prompt injection: the model emitted `POISON-CANARY-4417` in four
   probes (10/14). After the fix (pattern screening, sentence redaction, tag neutralisation and a

@@ -34,7 +34,7 @@ class ExplodingSink:
 
 
 class AnswerProvider:
-    def complete(self, system_prompt: str, user_prompt: str) -> str:
+    def complete(self, system_prompt: str, user_prompt: str, timeout: float | None = None) -> str:
         return ANSWER
 
 

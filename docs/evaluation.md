@@ -3,8 +3,10 @@
 ## Deterministic checks
 
 `uv run pytest -q` checks token handling, SQL access filtering, response citations, abstention,
-request bounds, generic provider/database errors, and metadata-only tracing. These tests use fake
-model and embedder implementations and do not call an external model.
+request bounds, generic provider/database errors, metadata-only tracing, and the optional agent's
+tool boundary. Agent tests verify one allowlisted retrieval call, role isolation, timeout, no writes,
+and no network calls from the tool path. They use fake model and embedder implementations and do
+not call an external model.
 
 `evals/public_questions.jsonl` contains 23 supported Swedish public-information questions, covering
 all eight sources, and five unsupported questions. `evals/sources.json` maps stable source IDs to
@@ -57,6 +59,16 @@ both demo tokens. The public principal abstained: no restricted citation, and th
 appear in the answer. The restricted principal cited the document and returned the marker. The
 temporary document was removed afterward (8 documents, 73 chunks). This verifies the server-side
 visibility filter end to end, using synthetic text only.
+
+### Read-only agent checks
+
+The optional `POST /v1/agent-query` endpoint was smoke-tested against the live local API and
+Ollama. A supported Swedish question returned an answer with citations. The deterministic agent
+tests additionally verify that only `search_documents` is offered, the server rejects an
+unallowlisted tool or multiple tool calls, public-role retrieval excludes restricted documents,
+the request deadline is enforced, and the tool path performs no writes or network connections.
+The model-provider call itself still uses the configured provider (local Ollama by default); the
+network restriction applies to agent tools, not that trusted model connection.
 
 ## Promptfoo probes
 
@@ -121,7 +133,7 @@ local `llama3.1` grader: unparseable verdicts or invented leaks (for example, a 
 number) in an empty answer. They are grader false positives, not vulnerabilities. A small local
 grader is not reliable evidence; the deterministic static suite is the primary result.
 
-The automated checks also pass locally: `uv run pytest -q` reports 84 passed and 1 skipped;
+The automated checks also pass locally: `uv run pytest -q` reports 96 passed and 1 skipped;
 `uv run ruff check .` and `uv run mypy src evals security` are clean.
 
 ## Recording results

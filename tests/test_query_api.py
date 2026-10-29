@@ -20,7 +20,7 @@ PUBLIC = {"Authorization": "Bearer tok-public"}
 
 
 class BoomProvider:
-    def complete(self, system_prompt: str, user_prompt: str) -> str:
+    def complete(self, system_prompt: str, user_prompt: str, timeout: float | None = None) -> str:
         raise ProviderError("secret internal detail")
 
 

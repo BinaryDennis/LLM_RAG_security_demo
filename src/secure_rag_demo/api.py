@@ -8,6 +8,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
+from secure_rag_demo.agent import AgentError, AgentProvider, run_read_only_agent
 from secure_rag_demo.answering import answer_question
 from secure_rag_demo.auth import Principal, resolve_principal
 from secure_rag_demo.config import get_settings
@@ -95,6 +96,46 @@ def create_app() -> FastAPI:
         record(len(chunks), "abstained" if abstained else "answered")
         return QueryResponse(
             answer=answer, citations=citations, abstained=abstained, request_id=request_id
+        )
+
+    @app.post("/v1/agent-query", response_model=QueryResponse)
+    def agent_query(
+        body: QueryRequest,
+        principal: Annotated[Principal, Depends(get_principal)],
+        session: Annotated[Session, Depends(get_session)],
+        embedder: Annotated[EmbeddingService, Depends(get_embedder)],
+        provider: Annotated[AgentProvider, Depends(get_provider)],
+        sink: Annotated[TraceSink | None, Depends(get_trace_sink)],
+    ) -> QueryResponse:
+        request_id = uuid.uuid4()
+        started = time.perf_counter()
+        model = get_settings().llm_model
+
+        def record(count: int, outcome: str) -> None:
+            trace_query(
+                sink,
+                request_id,
+                principal,
+                count,
+                model,
+                outcome,
+                (time.perf_counter() - started) * 1000,
+            )
+
+        try:
+            result = run_read_only_agent(body.question, principal, session, embedder, provider)
+        except SQLAlchemyError:
+            record(0, "db_error")
+            raise HTTPException(status_code=503, detail="Service unavailable") from None
+        except (AgentError, ProviderError):
+            record(0, "agent_error")
+            raise HTTPException(status_code=503, detail="Service unavailable") from None
+        record(len(result.citations), "abstained" if result.abstained else "answered")
+        return QueryResponse(
+            answer=result.answer,
+            citations=result.citations,
+            abstained=result.abstained,
+            request_id=request_id,
         )
 
     return app

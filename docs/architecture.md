@@ -18,6 +18,8 @@ is possible only by explicit configuration and must receive public demo data onl
 - **PostgreSQL + pgvector** stores source metadata, text chunks, visibility labels, and vectors.
   Cosine distance ranks matching chunks; an HNSW index accelerates nearest-neighbour search.
 - **ChatProvider** isolates the OpenAI-compatible model API. The default endpoint is local Ollama.
+- **Read-only agent** is an optional API path with one allowlisted retrieval tool and no write or
+  arbitrary network tools.
 - **LangSmith (optional)** receives operational metadata only. Tracing is disabled by default.
 
 ## Flows
@@ -47,13 +49,28 @@ are git-ignored; consult each publisher's reuse terms before storing or redistri
 The client never talks directly to Postgres or the model. The model never talks directly to the
 client or database.
 
+### Optional read-only agent
+
+`POST /v1/agent-query` uses the same server-resolved principal and validated question as the
+standard query route. The model is offered exactly one function, `search_documents`; the server
+rejects any other tool or argument shape and requires exactly one call. The tool embeds the chosen
+search question locally and calls the existing `search_chunks` service once, whose SQL visibility
+predicate still runs before ranking. The agent then answers from those chunks using the existing
+grounding, citation, and abstention logic.
+
+The agent exposes no write, browser, URL-fetch, or arbitrary network tool. Its trusted chat
+provider still receives the normal model request at the configured endpoint (localhost Ollama by
+default). A 30-second deadline bounds provider calls and sets PostgreSQL's statement timeout for
+retrieval. The agent cannot change the role or bypass SQL authorization.
+
 ## Trust boundaries and controls
 
 - **Client -> API:** HTTP request is untrusted; Pydantic bounds question length and rejects blanks.
 - **API -> database:** SQL uses the server-resolved visibility set. The query path is read-only.
 - **Retrieved documents -> model:** source text is untrusted and may contain prompt injection.
   Defences: ingestion screening, answer-time redaction of instruction-like sentences, `<sources>`
-  tag neutralisation, the system prompt and a reminder after the question; no tools are exposed.
+  tag neutralisation, the system prompt and a reminder after the question. The standard query
+  route exposes no tools; the optional agent exposes only the single retrieval tool described above.
 - **API -> model provider:** localhost is the default. Hosted use is opt-in and limited to public
   demo content.
 - **API -> telemetry:** tracing is opt-in, inputs and outputs are hidden, and the payload contains
@@ -68,9 +85,9 @@ designed to execute; the "Status" column records whether it actually has.
 
 | Layer | What runs | Needs | Verifies | Status |
 |---|---|---|---|---|
-| 1. Automated tests | `uv run pytest -q` (also in CI with Ruff and mypy) | Postgres only; fake model and embedder | Security controls, deterministically | Run; passing |
+| 1. Automated tests | `uv run pytest -q` (also in CI with Ruff and mypy) | Postgres only; fake model and embedder | Security controls, deterministically | Run; 96 passed, 1 skipped |
 | 2. Evaluation set | `uv run python -m evals.evaluate` | Running API, Ollama, ingested sources | Citations and abstention on 28 Swedish questions | Run; 28/28 on three consecutive runs |
-| 3. Promptfoo probes | `uv run python -m security.canaries`, then `npx promptfoo eval -c security/promptfoo-static.yaml` | Running API, local DB, Ollama app model | Prompt injection, role bypass, leakage and abstention | 10/14; prompt-injection finding |
+| 3. Promptfoo probes | `uv run python -m security.canaries`, then `npx promptfoo eval -c security/promptfoo-static.yaml` | Running API, local DB, Ollama app model | Prompt injection, role bypass, leakage and abstention | 16/16 after fix; residual risk remains |
 
 ### Layer 1: automated tests
 
@@ -85,6 +102,7 @@ designed to execute; the "Status" column records whether it actually has.
 | Tracing is off by default and LangSmith receives the hide settings | `tests/test_tracing.py` |
 | Promptfoo target refuses non-loopback URLs and requires a token | `tests/test_promptfoo_target.py` |
 | Synthetic canaries seed repeatably, enforce visibility, and remove only themselves | `tests/test_canaries.py` |
+| Agent exposes one retrieval tool, performs at most one retrieval, enforces deadline and role, and does not write or open network connections from its tool path | `tests/test_agent.py` |
 
 ### Layer 2: evaluation set
 
@@ -124,7 +142,7 @@ token per run; the target cannot itself add documents or compare roles in a sing
 
 ### Current status
 
-- **Layer 1:** executed; 84 tests pass and 1 is skipped. Ruff and mypy pass locally.
+- **Layer 1:** executed; 96 tests pass and 1 is skipped. Ruff and mypy pass locally.
 - **Layer 2:** executed; 28/28 cases pass on three consecutive runs.
 - **Layer 3:** prompt injection found (10/14), mitigated, and re-tested: 16/16 on two runs,
   including the evasive canary. Residual model-level risk remains. See

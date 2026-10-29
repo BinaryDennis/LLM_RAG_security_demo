@@ -34,7 +34,11 @@ def build_user_prompt(question: str, chunks: list[RetrievedChunk]) -> str:
 
 
 def answer_question(
-    question: str, chunks: list[RetrievedChunk], provider: ChatProvider
+    question: str,
+    chunks: list[RetrievedChunk],
+    provider: ChatProvider,
+    *,
+    timeout: float | None = None,
 ) -> tuple[str | None, list[Citation], bool]:
     """Return (answer, citations, abstained).
 
@@ -43,7 +47,7 @@ def answer_question(
     """
     if not chunks:
         return None, [], True
-    answer = provider.complete(SYSTEM_PROMPT, build_user_prompt(question, chunks))
+    answer = provider.complete(SYSTEM_PROMPT, build_user_prompt(question, chunks), timeout=timeout)
     # Fail safe: any mention of the sentinel is treated as abstention.
     if NO_ANSWER in answer:
         return None, [], True
