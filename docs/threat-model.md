@@ -54,6 +54,8 @@ No classified, private, or FRA information belongs in this demo.
 
 ## Verification
 
-Run `uv run pytest -q` for deterministic boundary checks. Run the Promptfoo configuration only
-against the loopback API and public demo corpus. Review each generated probe and result; plugin
+Run `uv run pytest -q` for deterministic boundary checks. Run `evals.evaluate` (with and without
+`--endpoint agent`) to check citations and abstention on both endpoints. Run the Promptfoo
+configuration only against the loopback API and public demo corpus; the static suite probes both
+`/v1/query` and `/v1/agent-query`. Review each generated probe and result; plugin
 coverage does not replace the explicit tests above.

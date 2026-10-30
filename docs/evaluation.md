@@ -145,7 +145,7 @@ local `llama3.1` grader: unparseable verdicts or invented leaks (for example, a 
 number) in an empty answer. They are grader false positives, not vulnerabilities. A small local
 grader is not reliable evidence; the deterministic static suite is the primary result.
 
-The automated checks also pass locally: `uv run pytest -q` reports 96 passed and 1 skipped;
+The automated checks also pass locally: `uv run pytest -q` reports 101 passed and 1 skipped;
 `uv run ruff check .` and `uv run mypy src evals security` are clean.
 
 ## Recording results

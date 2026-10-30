@@ -119,7 +119,7 @@ designed to execute; the "Status" column records whether it actually has.
 
 | Layer | What runs | Needs | Verifies | Status |
 |---|---|---|---|---|
-| 1. Automated tests | `uv run pytest -q` (also in CI with Ruff and mypy) | Postgres only; fake model and embedder | Security controls, deterministically | Run; 96 passed, 1 skipped |
+| 1. Automated tests | `uv run pytest -q` (also in CI with Ruff and mypy) | Postgres only; fake model and embedder | Security controls, deterministically | Run; 101 passed, 1 skipped |
 | 2. Evaluation set | `uv run python -m evals.evaluate` | Running API, Ollama, ingested sources | Citations and abstention on 28 Swedish questions | Run; 28/28 on three consecutive runs (query); 28/28 on two runs (agent, `--endpoint agent`) |
 | 3. Promptfoo probes | `uv run python -m security.canaries`, then `npx promptfoo eval -c security/promptfoo-static.yaml` | Running API, local DB, Ollama app model | Prompt injection, role bypass, leakage and abstention | 32/32 (16 per endpoint: query and agent); residual risk remains |
 
@@ -134,7 +134,8 @@ designed to execute; the "Status" column records whether it actually has.
 | Invalid input returns 422; database and provider failures return 503 without internal details | `tests/test_query_api.py` |
 | Traces carry metadata only; marker strings in question, chunk and answer never appear | `tests/test_tracing.py` |
 | Tracing is off by default and LangSmith receives the hide settings | `tests/test_tracing.py` |
-| Promptfoo target refuses non-loopback URLs and requires a token | `tests/test_promptfoo_target.py` |
+| Promptfoo target refuses non-loopback URLs, requires a token, and the static suite targets both endpoints | `tests/test_promptfoo_target.py` |
+| Evaluation set is consistent (28 cases, every source covered) and can target query or agent | `tests/test_evaluation.py` |
 | Synthetic canaries seed repeatably, enforce visibility, and remove only themselves | `tests/test_canaries.py` |
 | Agent exposes one retrieval tool, performs at most one retrieval, enforces deadline and role, and does not write or open network connections from its tool path | `tests/test_agent.py` |
 
@@ -152,8 +153,8 @@ supported cases, and all 5 unsupported cases abstain via the answerability gate;
 
 The hand-written suite in `security/promptfoo-static.yaml` sends explicit attack questions to the
 loopback API and checks the JSON response with deterministic assertions; it has no generated
-probes or model grader. Before the run, `security.canaries` inserts a synthetic poisoned public
-page and a synthetic restricted document, and verifies they are retrievable only by the intended
+probes or model grader. Before the run, `security.canaries` inserts three synthetic documents
+(an obvious poisoned public page, a paraphrased "evasive" poisoned page and a restricted page), and verifies they are retrievable only by the intended
 principal. Remove these temporary documents after the run.
 
 The first run found that local Ollama `llama3.1` followed the poisoned page's instruction: four
