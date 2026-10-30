@@ -11,9 +11,9 @@ The API finds the most relevant passages that your role is allowed to see, asks 
 model to answer **only from those passages**, and returns the answer with citations to the original
 URLs. If the sources do not contain the answer, it says so (`abstained: true`) instead of guessing.
 
-> **Constraints.** Public or synthetic data only: no FRA, classified or private data. Runs locally;
+> **Constraints.** Public or synthetic data only: no classified or private data. Runs locally;
 > not deployed publicly. Demo tokens and roles are for learning, not production authentication.
-> This project is not endorsed by FRA and is not suitable for classified data.
+> This project is not suitable for classified data.
 
 ### At a glance
 

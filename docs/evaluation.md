@@ -160,4 +160,4 @@ not proof that the system is secure.
 
 Tracing and dataset upload remain opt-in. Before an upload, review every dataset item and expected
 answer to ensure it is public. Verify the configured LangSmith project and hide settings. Never
-upload private questions, source text, answers, tokens, or FRA material.
+upload private questions, source text, answers, tokens, or private material.

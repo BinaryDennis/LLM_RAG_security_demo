@@ -13,7 +13,7 @@ query and agent paths read-only.
 - Retrieved chunks, questions, generated answers, and citations.
 - Database integrity, service availability, and trace metadata.
 
-No classified, private, or FRA information belongs in this demo.
+No classified, private, or sensitive information belongs in this demo.
 
 ## Trust boundaries
 

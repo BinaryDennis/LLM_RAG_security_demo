@@ -9,7 +9,7 @@
 
 ## Demo (about five minutes)
 
-1. **Frame the project:** this is a local educational prototype, not an FRA system or classified
+1. **Frame the project:** this is a local educational prototype, not an agency system or classified
    environment.
 2. **Show the flow:** a client sends a question and bearer token to FastAPI. The server resolves
    the principal, embeds the question locally, filters visibility in SQL, sends permitted chunks

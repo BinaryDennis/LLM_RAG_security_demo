@@ -1,6 +1,6 @@
 # Source documents
 
-Educational demo: **public documents only**. No FRA data, no private or classified material.
+Educational demo: **public documents only**. No private or classified material.
 
 Pages in the versioned evaluation set (`evals/sources.json`). Every page has at least two
 supported questions in `evals/public_questions.jsonl`:
