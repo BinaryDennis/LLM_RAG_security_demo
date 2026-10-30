@@ -1,193 +1,90 @@
 # Secure RAG Demo
 
-Educational demo of a secure, traceable, local Swedish RAG (Retrieval-Augmented Generation) API.
+A local, security-focused **RAG (Retrieval-Augmented Generation) API** that answers questions in
+Swedish from a small set of public Swedish government web pages, and shows its sources.
+It was built as a learning and portfolio project to show how an AI-driven system can be designed
+with **access control, traceability, prompt-injection defences and honest evaluation** from the
+start, rather than added afterwards.
 
-**Constraints:** public documents only, no FRA or private data, no public deployment. Demo tokens
-and roles are for learning, not production authentication. This project is not endorsed by FRA and
-is not suitable for classified data.
+You send a question such as *"Hur många dagar med föräldrapenning får föräldrar per barn?"* together with a bearer token.
+The API finds the most relevant passages that your role is allowed to see, asks a local language
+model to answer **only from those passages**, and returns the answer with citations to the original
+URLs. If the sources do not contain the answer, it says so (`abstained: true`) instead of guessing.
 
-## Quick start
+> **Constraints.** Public or synthetic data only: no FRA, classified or private data. Runs locally;
+> not deployed publicly. Demo tokens and roles are for learning, not production authentication.
+> This project is not endorsed by FRA and is not suitable for classified data.
 
-```bash
-cp .env.example .env
-docker compose up -d db          # Postgres 16 + pgvector on 127.0.0.1:5432
-uv sync --locked                 # install pinned dependencies
-uv run alembic upgrade head      # create tables
-uv run pytest -q                 # run tests
-uv run ruff check . && uv run mypy src evals security
-```
+### At a glance
 
-Ingest a reviewed public document (see `data/sources/README.md`):
-
-```bash
-uv run python -m secure_rag_demo.ingest_cli FILE --title T --url URL --version V
-```
-
-For the API demo, start Ollama separately, then run:
-
-```bash
-uv run uvicorn secure_rag_demo.main:app --host 127.0.0.1 --port 8000
-```
-
-The demo bearer token in `.env.example` is public and educational only. Set a local replacement
-before running the API. Never reuse a real credential.
-
-### Optional read-only agent
-
-`POST /v1/agent-query` is a stretch-goal demo endpoint. The model gets exactly one tool:
-`search_documents`. The server validates the tool call, performs at most one role-filtered
-retrieval, then answers from those results. There are no write or arbitrary network tools; the
-model-provider request still goes to the configured endpoint (localhost Ollama by default).
-Agent requests have a 30-second deadline and the retrieval query has a matching PostgreSQL
-statement timeout.
-
-```bash
-TOKEN=YOUR_LOCAL_DEMO_TOKEN
-curl -sS http://127.0.0.1:8000/v1/agent-query \
-  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"question":"Vad rekommenderar MCF för hemberedskap?"}'
-```
-
-## Security evaluation
-
-The deterministic suite checks authorization, grounded citations, abstention, provider/database
-errors, trace redaction, and the agent's tool allowlist, role isolation, timeout, and no-write
-behavior:
-
-```bash
-uv run pytest -q
-```
-
-The versioned evaluation set contains 23 supported Swedish public-information questions covering all
-eight ingested sources, and five unsupported questions. With the sources ingested and the local API running:
-
-```bash
-EVAL_BEARER_TOKEN=YOUR_LOCAL_DEMO_TOKEN uv run python -m evals.evaluate
-EVAL_BEARER_TOKEN=YOUR_LOCAL_DEMO_TOKEN uv run python -m evals.evaluate --endpoint agent
-```
-
-Optional Promptfoo probes run against the loopback API only:
-
-```bash
-uv run python -m security.canaries
-PROMPTFOO_BEARER_TOKEN=YOUR_LOCAL_DEMO_TOKEN \
-PROMPTFOO_DISABLE_SHARING=true \
-PROMPTFOO_DISABLE_TELEMETRY=1 \
-npx promptfoo@0.125.1 eval -c security/promptfoo-static.yaml
-uv run python -m security.canaries --remove
-```
-
-These hand-written probes require no generated attacks, cloud generation, or LLM grader. The
-seeded documents are synthetic and must be removed after the run. Sharing and telemetry are
-disabled by the command. The separate optional
-`security/promptfoo.yaml` red-team config uses local Ollama to generate probes for `pii:direct`
-and `rbac`; it does not include plugins that require cloud generation. Its local generated scan
-produced 20 cases; after the injection fix, the API abstained on all 20, and the 18 cases the
-local llama3.1 grader marked failed were triaged as grader false positives. Both configurations use one bearer
-token per run and cannot add documents themselves. See [evaluation limitations](docs/evaluation.md),
-the [threat model](docs/threat-model.md), and
-the [risk register](docs/risk-register.md). A passing probe is not proof of security.
-
-## Project evidence
-
-- [Architecture and data flow](docs/architecture.md)
-- [Local runbook](docs/runbook.md)
-- [Demo and interview script (Swedish and English)](docs/demo-script.md)
-- [Evaluation method and limits](docs/evaluation.md)
-
-## Troubleshooting (macOS with Colima)
-
-**`docker compose` says "unknown command", or "docker-credential-osxkeychain not found".**
-Colima's Docker CLI may lack the Compose plugin and credential helper. Use a temporary Docker
-config instead of editing `~/.docker`:
-
-```bash
-mkdir -p /tmp/dockercfg/cli-plugins
-printf '{"auths":{},"currentContext":"colima"}' > /tmp/dockercfg/config.json
-ln -sf /opt/homebrew/bin/docker-compose /tmp/dockercfg/cli-plugins/docker-compose
-cp -R ~/.docker/contexts /tmp/dockercfg/
-export DOCKER_CONFIG=/tmp/dockercfg
-docker compose up -d db
-```
-
-The `pgvector/pgvector:pg16` image is public, so no login is needed. This setup is temporary: it
-disappears on reboot, and you must run `export DOCKER_CONFIG=/tmp/dockercfg` in each new shell.
-
-**`CERTIFICATE_VERIFY_FAILED` when downloading the embedding model.**
-Your network may use a TLS-intercepting proxy whose certificate Python does not trust. Keep
-verification on and point Python at a CA bundle built from the macOS keychain:
-
-```bash
-security find-certificate -a -p /Library/Keychains/System.keychain \
-  /System/Library/Keychains/SystemRootCertificates.keychain > /tmp/macos-ca.pem
-SSL_CERT_FILE=/tmp/macos-ca.pem REQUESTS_CA_BUNDLE=/tmp/macos-ca.pem \
-  RUN_MODEL_SMOKE=1 uv run pytest tests/test_embeddings_smoke.py -q
-```
-
-Do not disable certificate verification. The model is cached after the first download, so later
-runs do not need this.
-
-## Learning guide (no Python experience assumed)
-
-### 1. Python basics you see in this repo
-
-- **Python** runs `.py` files line by line. Indentation (4 spaces) defines blocks, like `{}` in
-  other languages.
-- **Package**: a folder with `__init__.py`. `src/secure_rag_demo/` is our package.
-  `from secure_rag_demo.db import Base` means "from file db.py, take Base".
-- **Type hints**: `def f(x: str) -> int` says what goes in and out. Python ignores them at
-  runtime, but **mypy** checks them.
-- **Virtual environment (`.venv/`)**: a private folder of installed libraries for this project
-  only, so projects don't clash. **uv** creates and fills it.
-- **Dependency**: someone else's code you install (FastAPI, etc.), listed in `pyproject.toml`.
-- **`.toml` file**: a plain-text config format with `key = value` lines and `[sections]`.
-
-### 2. What each tool does
-
-| Tool | Analogy |
+| | |
 |---|---|
-| uv | Installs Python, creates the venv, locks exact dependency versions in `uv.lock` |
-| FastAPI | The front desk: receives HTTP requests, returns JSON |
-| Uvicorn | The building the front desk works in (the server process) |
-| Pydantic | A bouncer checking data has the right shape (`DocumentInput`) |
-| SQLAlchemy | Write Python classes instead of raw SQL (`Document`, `DocumentChunk` are tables) |
-| Alembic | Git for your database structure: migrations are versioned changes |
-| PostgreSQL | The actual database, running in Docker |
-| pgvector | Postgres add-on for storing and searching vectors |
-| FastEmbed | Runs the embedding model locally |
-| Docker/Compose | Runs Postgres in an isolated box, without installing it on your Mac |
-| pytest | Runs functions named `test_*` and reports pass/fail |
-| Ruff / mypy | Spellcheck for style and for types |
-| GitHub Actions | A robot that reruns all checks on every push |
+| **Corpus** | 8 public Swedish pages (IMY, DIGG, MCF, Försäkringskassan, SL), 73 chunks |
+| **Endpoints** | `POST /v1/query` (standard RAG) and `POST /v1/agent-query` (optional read-only agent) |
+| **Model** | `llama3.1` via local Ollama by default; embeddings run locally (multilingual E5) |
+| **Roles** | `public` and `restricted_demo`, resolved server-side from the bearer token |
+| **Verification** | 101 automated tests; 28/28 evaluation questions on both endpoints; 32/32 Promptfoo security probes |
 
-### 3. Key concepts
+## What it does
 
-**Embedding.** A model turns text into a list of numbers (here 384). Texts with similar *meaning*
-get similar numbers, even in different words. "Lösenord ska vara långa" and "passwords should be
-long" land close together. Think of each text as a point on a map; similar meaning means nearby
-points.
+- **Ingests reviewed documents.** Cleans, chunks (1,000 characters, 150 overlap), hashes and embeds
+  each public page locally, then stores text, vectors, source URL, version and visibility label in
+  PostgreSQL with pgvector. Documents that look like prompt injection are refused.
+- **Enforces access control in the database.** The caller's role comes from the token, never from
+  the request. The visibility filter is part of the SQL query and runs *before* ranking, so
+  restricted text never reaches the model for a public user.
+- **Answers with citations, or abstains.** The model receives only authorized passages, marked as
+  untrusted data. Citations always come from what was retrieved. If nothing relevant is found, or
+  the model replies `INSUFFICIENT_EVIDENCE`, the API returns a null answer and no citations.
+- **Defends against prompt injection.** Screening at ingestion, redaction of instruction-like
+  sentences at answer time, neutralised source tags, and a reminder after the question.
+- **Offers a constrained agent.** `/v1/agent-query` lets the model choose its own search text
+  through exactly one allowlisted, read-only tool. The server validates the tool call, keeps the
+  role, runs one search and enforces a 30-second deadline.
+- **Traces safely.** Optional LangSmith tracing records only metadata (request ID, role, counts,
+  model, duration, outcome), never the question, sources or answer.
+- **Fails safely.** Bad input returns 422, a bad token 401, and database or model failures a generic
+  503 with no internal details.
+- **Is tested in three layers.** Deterministic unit tests (in CI), a live evaluation set of 28
+  Swedish questions, and Promptfoo attack probes with planted canary documents.
 
-**Vector.** That list of numbers. "Distance" between two vectors (we use cosine distance)
-measures how different the meanings are.
+## What it does not do
 
-**Vector database / pgvector.** A normal database finds exact matches
-(`WHERE title = 'x'`). A vector database finds the *nearest* vectors to a query vector. pgvector
-gives Postgres a `VECTOR(384)` column type and fast nearest-neighbour search. The **HNSW index**
-is a shortcut structure so it doesn't compare against every row.
+- **No production authentication.** Static demo tokens stand in for a real identity provider.
+- **No writes through the API.** Documents are added only through the ingestion CLI; neither the
+  API nor the agent can change data.
+- **No web browsing or open-ended agent.** The agent has one search tool and no URL-fetch, file,
+  shell or network tools.
+- **No guarantee against prompt injection.** Defences reduce the risk; a paraphrased attack
+  (the "evasive canary") is only resisted by the model itself. See the
+  [risk register](docs/risk-register.md).
+- **No factual-correctness grading.** The evaluation checks citations and abstention, not whether
+  every sentence is entailed by the source.
+- **No scale or availability features.** No rate limiting, queueing, high availability or UI.
+- **No cloud dependency by default.** Hosted models and tracing are opt-in and meant for public
+  demo content only.
 
-**Ingestion.** Preparing documents for search, once, ahead of time:
-1. Read the text and clean it (normalize whitespace).
-2. **Chunk**: split into ~1000-character pieces with 150 overlap, since models and search work
-   better on small passages.
-3. **Hash**: fingerprint the text (SHA-256) so the same document isn't stored twice.
-4. **Embed**: turn each chunk into a vector, locally via FastEmbed.
-5. **Store**: save the chunk text and vector in Postgres.
+## Tools used
 
-**RAG.** At question time: embed the question, find the nearest chunks, hand them to an LLM with
-"answer only from these", and return the answer with citations. It reduces made-up answers and
-lets you point to sources.
+| Tool | Used for | Analogy |
+|---|---|---|
+| Python 3.12 + uv | Language; uv installs Python and locks dependency versions in `uv.lock` | Package manager and toolbox |
+| FastAPI + Uvicorn | HTTP API and the server process that runs it | Front desk and the building it works in |
+| Pydantic | Validates requests, responses and settings | A bouncer checking data has the right shape |
+| PostgreSQL 16 + pgvector | Stores documents, chunks and vectors; nearest-neighbour search with an HNSW index | A library catalogue that can find "similar" books |
+| SQLAlchemy + Alembic | Python classes for tables; versioned database migrations | Git for your database structure |
+| FastEmbed (`multilingual-e5-small`) | Local 384-dimensional embeddings for Swedish text | Turns meaning into map coordinates |
+| Ollama (`llama3.1`) | Local LLM behind an OpenAI-compatible API | The writer who answers from the given notes |
+| LangSmith (optional) | Metadata-only request tracing | A flight recorder without the conversation |
+| Docker Compose | Runs Postgres in a container, bound to `127.0.0.1` | An isolated box on your Mac |
+| pytest, Ruff, mypy | Tests, linting/formatting, type checking | Inspector, spellcheck for style and for types |
+| Promptfoo | Runs attack probes against the live API | A friendly attacker with a checklist |
+| GitHub Actions | Reruns migrations, lint, types and tests on every push | A robot that rechecks everything |
 
-### 4. Architecture
+## Architecture overview
+
+FastAPI is the only component the client talks to. It orchestrates every step, so all security
+rules (role, filtering, prompt protections, tracing) are enforced in one place.
 
 ```
    ONE-TIME: INGESTION (built)
@@ -281,7 +178,7 @@ Reading the agent numbers:
 - Traces hold metadata only, never content.
 - Everything runs locally by default.
 
-#### How the system is tested and verified
+### How the system is tested and verified
 
 Testing happens in three layers. Each layer catches different problems, and none of them alone proves the system is secure.
 All three layers have been run. Layer 3 first found prompt injection; it was mitigated and
@@ -338,8 +235,8 @@ against synthetic public and restricted canary documents. A run:
 1. **Seeds canaries:** `uv run python -m security.canaries` adds a synthetic poisoned public page
    a paraphrased (evasive) poisoned page that the patterns miss, and a synthetic restricted
    document, then checks that retrieval can find the expected canaries.
-2. **Sends probes:** `security/promptfoo_target.py` posts each hand-written question to
-   `http://127.0.0.1:8000/v1/query`.
+2. **Sends probes:** `security/promptfoo_target.py` posts each hand-written question to both
+   `http://127.0.0.1:8000/v1/query` and `http://127.0.0.1:8000/v1/agent-query`.
    It refuses any non-loopback address.
 3. **Checks replies:** deterministic assertions check JSON shape, canary non-disclosure, and
    abstention for questions about invented private data. No model grades the result.
@@ -362,7 +259,7 @@ Promptfoo itself may be downloaded by `npx`. The companion red-team config
   `/v1/agent-query`: 32/32 passed (16 per endpoint, same answers and abstentions).
   See [docs/evaluation.md](docs/evaluation.md).
 
-### 5. Project map: what each file is responsible for
+## Project map: what each file is responsible for
 
 **Application code (`src/secure_rag_demo/`)**
 
@@ -431,3 +328,171 @@ afterwards, plus a fake embedder.
 4. `src/secure_rag_demo/api.py`: follow one request from start to finish.
 
 Run one test to watch it work: `uv run pytest tests/test_ingest.py -v`
+
+## Quick start
+
+```bash
+cp .env.example .env
+docker compose up -d db          # Postgres 16 + pgvector on 127.0.0.1:5432
+uv sync --locked                 # install pinned dependencies
+uv run alembic upgrade head      # create tables
+uv run pytest -q                 # run tests
+uv run ruff check . && uv run mypy src evals security
+```
+
+Ingest a reviewed public document (see `data/sources/README.md`):
+
+```bash
+uv run python -m secure_rag_demo.ingest_cli FILE --title T --url URL --version V
+```
+
+For the API demo, start Ollama separately, then run:
+
+```bash
+uv run uvicorn secure_rag_demo.main:app --host 127.0.0.1 --port 8000
+```
+
+The demo bearer token in `.env.example` is public and educational only. Set a local replacement
+before running the API. Never reuse a real credential.
+
+### Try the optional read-only agent
+
+`POST /v1/agent-query` is a stretch-goal demo endpoint. The model gets exactly one tool:
+`search_documents`. The server validates the tool call, performs at most one role-filtered
+retrieval, then answers from those results. There are no write or arbitrary network tools; the
+model-provider request still goes to the configured endpoint (localhost Ollama by default).
+Agent requests have a 30-second deadline and the retrieval query has a matching PostgreSQL
+statement timeout.
+
+```bash
+TOKEN=YOUR_LOCAL_DEMO_TOKEN
+curl -sS http://127.0.0.1:8000/v1/agent-query \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"question":"Vad rekommenderar MCF för hemberedskap?"}'
+```
+
+## Security evaluation
+
+The deterministic suite checks authorization, grounded citations, abstention, provider/database
+errors, trace redaction, and the agent's tool allowlist, role isolation, timeout, and no-write
+behavior:
+
+```bash
+uv run pytest -q
+```
+
+The versioned evaluation set contains 23 supported Swedish public-information questions covering all
+eight ingested sources, and five unsupported questions. With the sources ingested and the local API running:
+
+```bash
+EVAL_BEARER_TOKEN=YOUR_LOCAL_DEMO_TOKEN uv run python -m evals.evaluate
+EVAL_BEARER_TOKEN=YOUR_LOCAL_DEMO_TOKEN uv run python -m evals.evaluate --endpoint agent
+```
+
+Optional Promptfoo probes run against the loopback API only:
+
+```bash
+uv run python -m security.canaries
+PROMPTFOO_BEARER_TOKEN=YOUR_LOCAL_DEMO_TOKEN \
+PROMPTFOO_DISABLE_SHARING=true \
+PROMPTFOO_DISABLE_TELEMETRY=1 \
+npx promptfoo@0.125.1 eval -c security/promptfoo-static.yaml
+uv run python -m security.canaries --remove
+```
+
+These hand-written probes require no generated attacks, cloud generation, or LLM grader. The
+seeded documents are synthetic and must be removed after the run. Sharing and telemetry are
+disabled by the command. The separate optional
+`security/promptfoo.yaml` red-team config uses local Ollama to generate probes for `pii:direct`
+and `rbac`; it does not include plugins that require cloud generation. Its local generated scan
+produced 20 cases; after the injection fix, the API abstained on all 20, and the 18 cases the
+local llama3.1 grader marked failed were triaged as grader false positives. Both configurations use one bearer
+token per run and cannot add documents themselves. See [evaluation limitations](docs/evaluation.md),
+the [threat model](docs/threat-model.md), and
+the [risk register](docs/risk-register.md). A passing probe is not proof of security.
+
+## Documentation
+
+- [Architecture and data flow](docs/architecture.md)
+- [Threat model](docs/threat-model.md)
+- [Risk register](docs/risk-register.md)
+- [Evaluation method, results and limits](docs/evaluation.md)
+- [Local runbook](docs/runbook.md)
+- [Demo and interview script (Swedish and English)](docs/demo-script.md)
+
+## Troubleshooting (macOS with Colima)
+
+**`docker compose` says "unknown command", or "docker-credential-osxkeychain not found".**
+Colima's Docker CLI may lack the Compose plugin and credential helper. Use a temporary Docker
+config instead of editing `~/.docker`:
+
+```bash
+mkdir -p /tmp/dockercfg/cli-plugins
+printf '{"auths":{},"currentContext":"colima"}' > /tmp/dockercfg/config.json
+ln -sf /opt/homebrew/bin/docker-compose /tmp/dockercfg/cli-plugins/docker-compose
+cp -R ~/.docker/contexts /tmp/dockercfg/
+export DOCKER_CONFIG=/tmp/dockercfg
+docker compose up -d db
+```
+
+The `pgvector/pgvector:pg16` image is public, so no login is needed. This setup is temporary: it
+disappears on reboot, and you must run `export DOCKER_CONFIG=/tmp/dockercfg` in each new shell.
+
+**`CERTIFICATE_VERIFY_FAILED` when downloading the embedding model.**
+Your network may use a TLS-intercepting proxy whose certificate Python does not trust. Keep
+verification on and point Python at a CA bundle built from the macOS keychain:
+
+```bash
+security find-certificate -a -p /Library/Keychains/System.keychain \
+  /System/Library/Keychains/SystemRootCertificates.keychain > /tmp/macos-ca.pem
+SSL_CERT_FILE=/tmp/macos-ca.pem REQUESTS_CA_BUNDLE=/tmp/macos-ca.pem \
+  RUN_MODEL_SMOKE=1 uv run pytest tests/test_embeddings_smoke.py -q
+```
+
+Do not disable certificate verification. The model is cached after the first download, so later
+runs do not need this.
+
+## Learning guide (no Python experience assumed)
+
+Tools are described in [Tools used](#tools-used) and the architecture in
+[Architecture overview](#architecture-overview).
+
+### 1. Python basics you see in this repo
+
+- **Python** runs `.py` files line by line. Indentation (4 spaces) defines blocks, like `{}` in
+  other languages.
+- **Package**: a folder with `__init__.py`. `src/secure_rag_demo/` is our package.
+  `from secure_rag_demo.db import Base` means "from file db.py, take Base".
+- **Type hints**: `def f(x: str) -> int` says what goes in and out. Python ignores them at
+  runtime, but **mypy** checks them.
+- **Virtual environment (`.venv/`)**: a private folder of installed libraries for this project
+  only, so projects don't clash. **uv** creates and fills it.
+- **Dependency**: someone else's code you install (FastAPI, etc.), listed in `pyproject.toml`.
+- **`.toml` file**: a plain-text config format with `key = value` lines and `[sections]`.
+
+### 2. Key concepts
+
+**Embedding.** A model turns text into a list of numbers (here 384). Texts with similar *meaning*
+get similar numbers, even in different words. "Lösenord ska vara långa" and "passwords should be
+long" land close together. Think of each text as a point on a map; similar meaning means nearby
+points.
+
+**Vector.** That list of numbers. "Distance" between two vectors (we use cosine distance)
+measures how different the meanings are.
+
+**Vector database / pgvector.** A normal database finds exact matches
+(`WHERE title = 'x'`). A vector database finds the *nearest* vectors to a query vector. pgvector
+gives Postgres a `VECTOR(384)` column type and fast nearest-neighbour search. The **HNSW index**
+is a shortcut structure so it doesn't compare against every row.
+
+**Ingestion.** Preparing documents for search, once, ahead of time:
+1. Read the text and clean it (normalize whitespace).
+2. **Chunk**: split into ~1000-character pieces with 150 overlap, since models and search work
+   better on small passages.
+3. **Hash**: fingerprint the text (SHA-256) so the same document isn't stored twice.
+4. **Embed**: turn each chunk into a vector, locally via FastEmbed.
+5. **Store**: save the chunk text and vector in Postgres.
+
+**RAG.** At question time: embed the question, find the nearest chunks, hand them to an LLM with
+"answer only from these", and return the answer with citations. It reduces made-up answers and
+lets you point to sources.

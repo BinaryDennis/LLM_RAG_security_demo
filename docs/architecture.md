@@ -23,7 +23,7 @@ is possible only by explicit configuration and must receive public demo data onl
 - **LangSmith (optional)** receives operational metadata only. Tracing is disabled by default.
 
 For a file-by-file list of responsibilities, see the
-[project map in the README](../README.md#5-project-map-what-each-file-is-responsible-for).
+[project map in the README](../README.md#project-map-what-each-file-is-responsible-for).
 
 ## Flows
 
